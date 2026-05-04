@@ -163,5 +163,5 @@ def try_barrier():
     """Attempt a barrier but ignore any exceptions"""
     try:
         dist.barrier()
-    except:
+    except Exception:
         pass

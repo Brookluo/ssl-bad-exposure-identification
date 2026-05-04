@@ -68,12 +68,18 @@ def main(args: Namespace) -> None:
                 f'--gpu-idx={i}'
             ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         procs.append(proc)
-    for proc in procs:
+    errors = []
+    for i, proc in enumerate(procs):
         proc.wait()
         stdout, stderr = proc.communicate()
-        print(stdout.decode('utf-8'))
+        if stdout:
+            print(stdout.decode('utf-8'))
         if stderr:
             print(stderr.decode('utf-8'))
+        if proc.returncode != 0:
+            errors.append(f"GPU {i} failed with code {proc.returncode}")
+    if errors:
+        raise RuntimeError("; ".join(errors))
     print("Done.")
 
         

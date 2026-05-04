@@ -95,6 +95,9 @@ def gen_embeds(model: torch.nn.Module, exp_dir: str | Path, imdir: str | Path, a
         print("Using GPU")
         gpu = torch.device("cuda", args.gpu_idx)
         model = model.cuda(gpu)
+    else:
+        gpu = None
+        print("Using CPU")
 
     # (2046 // 14) * 14 = 2044
     # (4096 // 14) * 14 = 4088
@@ -140,6 +143,8 @@ def gen_embeds(model: torch.nn.Module, exp_dir: str | Path, imdir: str | Path, a
 def main() -> None:
     parser = argparse.ArgumentParser('Generate feature vector with trained models', parents=[get_arguments()])
     args = parser.parse_args()
+    if not torch.cuda.is_available():
+        print("WARNING: No GPU detected. Inference will run on CPU (very slow).")
     print("Generating:")
     print(args)
     model = create_model(args.model_size, use_register=True)
