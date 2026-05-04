@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 from torch.utils.data import Dataset
 import numpy as np
+import numpy.typing as npt
+from astropy.io import fits
 from pathlib import Path
 import pandas as pd
 from . import decam_info
@@ -8,6 +12,7 @@ from typing import Union
 import logging
 
 logger = logging.getLogger(__name__)
+ReasonDict = dict[str, int]
 
 
 class DECamImageDataset(Dataset):
@@ -38,7 +43,7 @@ class DECamImageDataset(Dataset):
     def __len__(self):
         return len(self.df_data)
     
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> tuple[np.ndarray, int]:
         idx = self.access_idx[idx]
         data_row = self.df_data.iloc[idx]
         with fits.open(self.image_dir / data_row['image_filename'], 'r') as hdul:
@@ -79,7 +84,7 @@ class DECamImageDataset(Dataset):
         # arr_sources[sources-1] = 1
         return img_data, out_reason
         
-    def shuffle(self, seed):
+    def shuffle(self, seed: int) -> None:
         rng = np.random.default_rng(self.seed + seed)
         new_mat = rng.permuted(rng.permutation(self.idx_mat), axis=1)
         new_acc_idx = new_mat.ravel()
@@ -110,7 +115,7 @@ class DECamExposureDataset(Dataset):
         ValueError: If the bad exposure table format is unknown.
     """
 
-    def __init__(self, bad_exp_table_path: Union[Path, str], imdir: Path, padding=False):
+    def __init__(self, bad_exp_table_path: str | Path, imdir: Path, padding: bool = False) -> None:
         if isinstance(bad_exp_table_path, str):
             bad_exp_table_path = Path(bad_exp_table_path)
         if bad_exp_table_path.suffix == ".csv":

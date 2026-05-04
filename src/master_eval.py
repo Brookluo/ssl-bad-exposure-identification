@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import subprocess
 from pathlib import Path
 from argparse import Namespace, ArgumentParser
@@ -6,9 +8,10 @@ import sys
 import pandas as pd
 import torch
 from .parallel_eval import split_dset
+from .config import load_config, PipelineConfig
 
 
-def get_parser():
+def get_parser() -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument("-dir", "--output-dir", type=str, required=True,
                             help='full directory path')
@@ -20,10 +23,13 @@ def get_parser():
                         help='Path to DECam image directory (overrides dr-based default)')
     parser.add_argument("--cont", action="store_true",
                         help='Whether to continue last inferencing')
+    parser.add_argument("--config", type=str, default=None,
+                        help='Path to YAML config file')
     return parser
 
 
-def main(args):
+def main(args: Namespace) -> None:
+    pipe_config, _ = load_config(args.config)
     num_gpu = torch.cuda.device_count()
     output_dir = Path(args.output_dir)
     worker_dset_dir = output_dir / "tmp"
@@ -70,12 +76,18 @@ def main(args):
                 f'--gpu-idx={i}'
             ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         procs.append(proc)
-    for proc in procs:
+    errors = []
+    for i, proc in enumerate(procs):
         proc.wait()
         stdout, stderr = proc.communicate()
-        print(stdout.decode('utf-8'))
+        if stdout:
+            print(stdout.decode('utf-8'))
         if stderr:
             print(stderr.decode('utf-8'))
+        if proc.returncode != 0:
+            errors.append(f"GPU {i} failed with code {proc.returncode}")
+    if errors:
+        raise RuntimeError("; ".join(errors))
     print("Done.")
 
         

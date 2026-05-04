@@ -1,6 +1,6 @@
 # Refactoring Phase 2 — Package, Types, Tests, Error Handling, Config
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Make the codebase pip-installable, type-safe, tested, and config-driven.
 
@@ -17,7 +17,7 @@
 **Files:**
 - Create: `pyproject.toml`
 
-- [ ] **Step 1: Write pyproject.toml**
+- [x] **Step 1: Write pyproject.toml**
 
 ```toml
 [build-system]
@@ -50,12 +50,12 @@ include = ["src*"]
 master-eval = "src.master_eval:main"
 ```
 
-- [ ] **Step 2: Verify it parses**
+- [x] **Step 2: Verify it parses**
 
 Run: `python -c "import tomllib; tomllib.load(open('pyproject.toml','rb'))"`
 Expected: no error, exits clean
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pyproject.toml
@@ -67,7 +67,7 @@ git commit -m "build: add pyproject.toml for pip-installable package"
 **Files:**
 - Modify: `src/read_image.py`
 
-- [ ] **Step 1: Replace the file content with type-annotated version**
+- [x] **Step 1: Replace the file content with type-annotated version**
 
 Replace the entire file:
 
@@ -158,12 +158,12 @@ if __name__ == "__main__":
             fp.unlink()
 ```
 
-- [ ] **Step 2: Verify syntax**
+- [x] **Step 2: Verify syntax**
 
 Run: `python -m py_compile src/read_image.py`
 Expected: no error
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/read_image.py
@@ -175,7 +175,7 @@ git commit -m "types: add type hints to read_image.py"
 **Files:**
 - Modify: `src/decam_info.py`
 
-- [ ] **Step 1: Add `from __future__ import annotations` and update function signatures**
+- [x] **Step 1: Add `from __future__ import annotations` and update function signatures**
 
 Replace lines 1-2 with:
 
@@ -197,12 +197,12 @@ Replace `decode_vi_source` signature with:
 def decode_vi_source(bit_source: int) -> list[str]:
 ```
 
-- [ ] **Step 2: Verify syntax**
+- [x] **Step 2: Verify syntax**
 
 Run: `python -m py_compile src/decam_info.py`
 Expected: no error
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/decam_info.py
@@ -214,7 +214,7 @@ git commit -m "types: add type hints to decam_info.py"
 **Files:**
 - Modify: `src/decam_dataset.py`
 
-- [ ] **Step 1: Add `from __future__ import annotations`, fix missing `fits` import**
+- [x] **Step 1: Add `from __future__ import annotations`, fix missing `fits` import**
 
 Replace the top of the file:
 
@@ -258,12 +258,12 @@ Replace `DECamExposureDataset.__init__` type hint:
     def __init__(self, bad_exp_table_path: str | Path, imdir: Path, padding: bool = False) -> None:
 ```
 
-- [ ] **Step 2: Verify syntax**
+- [x] **Step 2: Verify syntax**
 
 Run: `python -m py_compile src/decam_dataset.py`
 Expected: no error
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/decam_dataset.py
@@ -275,7 +275,7 @@ git commit -m "types: add type hints and fix missing fits import in decam_datase
 **Files:**
 - Modify: `src/decam_focalplane.py`
 
-- [ ] **Step 1: Add type hints to function signatures**
+- [x] **Step 1: Add type hints to function signatures**
 
 Replace `plot_decam_exposure` signature:
 
@@ -298,12 +298,12 @@ def assemble_focal_plane(
 ) -> np.ndarray:
 ```
 
-- [ ] **Step 2: Verify syntax**
+- [x] **Step 2: Verify syntax**
 
 Run: `python -m py_compile src/decam_focalplane.py`
 Expected: no error
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/decam_focalplane.py
@@ -316,7 +316,7 @@ git commit -m "types: add type hints to decam_focalplane.py"
 - Modify: `src/master_eval.py`
 - Modify: `src/parallel_eval.py`
 
-- [ ] **Step 1: Add `from __future__ import annotations` and type return hints to master_eval.py**
+- [x] **Step 1: Add `from __future__ import annotations` and type return hints to master_eval.py**
 
 Add after `import torch`:
 
@@ -331,7 +331,7 @@ def get_parser() -> ArgumentParser:
 def main(args: Namespace) -> None:
 ```
 
-- [ ] **Step 2: Add type hints to parallel_eval.py**
+- [x] **Step 2: Add type hints to parallel_eval.py**
 
 Add after `import torch`:
 
@@ -349,12 +349,12 @@ def gen_embeds(model: torch.nn.Module, exp_dir: str | Path, imdir: str | Path, a
 def main() -> None:
 ```
 
-- [ ] **Step 3: Verify both files**
+- [x] **Step 3: Verify both files**
 
 Run: `python -m py_compile src/master_eval.py && python -m py_compile src/parallel_eval.py`
 Expected: no errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/master_eval.py src/parallel_eval.py
@@ -367,7 +367,7 @@ git commit -m "types: add type hints to master_eval.py and parallel_eval.py"
 - Modify: `src/inference.py`
 - Modify: `src/util.py`
 
-- [ ] **Step 1: Add type hints to inference.py**
+- [x] **Step 1: Add type hints to inference.py**
 
 Replace:
 
@@ -396,7 +396,7 @@ def read_embeds(target_dir: str | Path, num: int = 4
     return data, idx, label
 ```
 
-- [ ] **Step 2: Add type hints to util.py**
+- [x] **Step 2: Add type hints to util.py**
 
 Replace:
 
@@ -453,12 +453,12 @@ def make_webpage(
             web.write(base_tmpl.format("\n".join(content)))
 ```
 
-- [ ] **Step 3: Verify both files**
+- [x] **Step 3: Verify both files**
 
 Run: `python -m py_compile src/inference.py && python -m py_compile src/util.py`
 Expected: no errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/inference.py src/util.py
@@ -474,7 +474,7 @@ git commit -m "types: add type hints to inference.py and util.py"
 **Files:**
 - Create: `tests/conftest.py`
 
-- [ ] **Step 1: Create conftest.py with shared fixtures**
+- [x] **Step 1: Create conftest.py with shared fixtures**
 
 ```python
 from pathlib import Path
@@ -547,12 +547,12 @@ def sample_html_path(tmp_data_dir: Path) -> str:
     return str(path)
 ```
 
-- [ ] **Step 2: Verify py_compile**
+- [x] **Step 2: Verify py_compile**
 
 Run: `python -m py_compile tests/conftest.py`
 Expected: no error
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/conftest.py
@@ -564,7 +564,7 @@ git commit -m "test: add shared fixtures in conftest.py"
 **Files:**
 - Create: `tests/test_decam_info.py`
 
-- [ ] **Step 1: Write tests for decam_info constants and decode functions**
+- [x] **Step 1: Write tests for decam_info constants and decode functions**
 
 ```python
 """Tests for src.decam_info — CCD mappings and reason bitmask decoders."""
@@ -657,12 +657,12 @@ class TestIsMiss2Ccd:
         assert result is False
 ```
 
-- [ ] **Step 2: Verify syntax**
+- [x] **Step 2: Verify syntax**
 
 Run: `python -m py_compile tests/test_decam_info.py`
 Expected: no error
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/test_decam_info.py
@@ -675,7 +675,7 @@ git commit -m "test: add tests for decam_info CCD mappings and reason decoders"
 - Create: `tests/test_read_image.py`
 - Create: `tests/test_inference.py`
 
-- [ ] **Step 1: Write test_read_image.py**
+- [x] **Step 1: Write test_read_image.py**
 
 ```python
 """Tests for src.read_image — NPZ read/write round-trip."""
@@ -705,7 +705,7 @@ class TestSaveImgNpz:
         pass
 ```
 
-- [ ] **Step 2: Write test_inference.py**
+- [x] **Step 2: Write test_inference.py**
 
 ```python
 """Tests for src.inference — HDF5 embedding reader."""
@@ -730,12 +730,12 @@ class TestReadEmbeds:
         assert data[0].shape == (1, 768)
 ```
 
-- [ ] **Step 3: Verify both files**
+- [x] **Step 3: Verify both files**
 
 Run: `python -m py_compile tests/test_read_image.py && python -m py_compile tests/test_inference.py`
 Expected: no errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/test_read_image.py tests/test_inference.py
@@ -748,7 +748,7 @@ git commit -m "test: add tests for read_image and inference"
 - Create: `tests/test_util.py`
 - Create: `tests/test_parallel_eval.py`
 
-- [ ] **Step 1: Write test_util.py**
+- [x] **Step 1: Write test_util.py**
 
 ```python
 """Tests for src.util — HTML parsing and webpage generation."""
@@ -794,7 +794,7 @@ class TestMakeWebpage:
         assert "</table>" in html
 ```
 
-- [ ] **Step 2: Write test_parallel_eval.py**
+- [x] **Step 2: Write test_parallel_eval.py**
 
 ```python
 """Tests for src.parallel_eval — dataset splitting."""
@@ -833,12 +833,12 @@ class TestSplitDset:
         assert len(result) == 0
 ```
 
-- [ ] **Step 3: Verify both files**
+- [x] **Step 3: Verify both files**
 
 Run: `python -m py_compile tests/test_util.py && python -m py_compile tests/test_parallel_eval.py`
 Expected: no errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/test_util.py tests/test_parallel_eval.py
@@ -854,7 +854,7 @@ git commit -m "test: add tests for util and parallel_eval"
 **Files:**
 - Modify: `src/master_eval.py`
 
-- [ ] **Step 1: Add error checking after subprocess calls**
+- [x] **Step 1: Add error checking after subprocess calls**
 
 Replace the subprocess loop (lines 57-78):
 
@@ -890,12 +890,12 @@ Replace the subprocess loop (lines 57-78):
     print("Done.")
 ```
 
-- [ ] **Step 2: Verify syntax**
+- [x] **Step 2: Verify syntax**
 
 Run: `python -m py_compile src/master_eval.py`
 Expected: no error
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/master_eval.py
@@ -908,7 +908,7 @@ git commit -m "fix: raise on subprocess failure in master_eval.py"
 - Modify: `src/read_image.py`
 - Modify: `src/parallel_eval.py`
 
-- [ ] **Step 1: Add file-not-found check to read_image.py's read_image function**
+- [x] **Step 1: Add file-not-found check to read_image.py's read_image function**
 
 Replace the `read_image` function body:
 
@@ -927,7 +927,7 @@ def read_image(image_path: str | Path, padding: bool) -> tuple[np.ndarray, list[
         raise ValueError(f"Unknown image format: {image_path.suffix}")
 ```
 
-- [ ] **Step 2: Add GPU fallback warning to parallel_eval.py's create_model / gen_embeds**
+- [x] **Step 2: Add GPU fallback warning to parallel_eval.py's create_model / gen_embeds**
 
 After `import torch` (already at top), no change needed. Instead, add a guard in `main()`:
 
@@ -968,7 +968,7 @@ With:
         print("Using CPU")
 ```
 
-- [ ] **Step 3: Fix bare except in distributed.py try_barrier**
+- [x] **Step 3: Fix bare except in distributed.py try_barrier**
 
 Replace:
 
@@ -992,12 +992,12 @@ def try_barrier():
         pass
 ```
 
-- [ ] **Step 4: Verify all three files**
+- [x] **Step 4: Verify all three files**
 
 Run: `python -m py_compile src/read_image.py && python -m py_compile src/parallel_eval.py && python -m py_compile src/distributed.py`
 Expected: no errors
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/read_image.py src/parallel_eval.py src/distributed.py
@@ -1010,7 +1010,7 @@ git commit -m "fix: add file-not-found check, GPU fallback, bare except fix"
 - Modify: `src/decam_dataset.py`
 - Modify: `src/util.py`
 
-- [ ] **Step 1: Verify decam_dataset.py already has `from astropy.io import fits`**
+- [x] **Step 1: Verify decam_dataset.py already has `from astropy.io import fits`**
 
 This was already added in Task 4 (type hints). Verify by running:
 
@@ -1022,7 +1022,7 @@ Expected output: `4: from astropy.io import fits`
 
 If missing, add it.
 
-- [ ] **Step 2: Add empty-HTMl guard to util.py get_info_from_html**
+- [x] **Step 2: Add empty-HTMl guard to util.py get_info_from_html**
 
 Replace:
 
@@ -1059,12 +1059,12 @@ import logging
 logger = logging.getLogger(__name__)
 ```
 
-- [ ] **Step 3: Verify both files**
+- [x] **Step 3: Verify both files**
 
 Run: `python -m py_compile src/decam_dataset.py && python -m py_compile src/util.py`
 Expected: no errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/decam_dataset.py src/util.py
@@ -1080,7 +1080,7 @@ git commit -m "fix: add file-not-found guard in util.py, verify fits import in d
 **Files:**
 - Create: `src/config.py`
 
-- [ ] **Step 1: Write the config module**
+- [x] **Step 1: Write the config module**
 
 ```python
 """Config dataclasses for the embedding pipeline.
@@ -1172,12 +1172,12 @@ def load_config(yaml_path: str | Path | None = None) -> tuple[PipelineConfig, Vi
     return pipe, viz
 ```
 
-- [ ] **Step 2: Verify syntax**
+- [x] **Step 2: Verify syntax**
 
 Run: `python -m py_compile src/config.py`
 Expected: no error
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/config.py
@@ -1189,7 +1189,7 @@ git commit -m "feat: add config module with PipelineConfig and VisualizationConf
 **Files:**
 - Modify: `src/config.yaml`
 
-- [ ] **Step 1: Replace config.yaml content**
+- [x] **Step 1: Replace config.yaml content**
 
 ```yaml
 # Pipeline and visualization configuration.
@@ -1212,7 +1212,7 @@ visualization:
   surveyccd_path_dr8: null       # overrides SURVEYCCD_PATH_DR8 env var
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add src/config.yaml
@@ -1225,7 +1225,7 @@ git commit -m "config: expand config.yaml with all pipeline parameters"
 - Modify: `src/master_eval.py`
 - Modify: `src/parallel_eval.py`
 
-- [ ] **Step 1: Add --config arg to master_eval.py parser**
+- [x] **Step 1: Add --config arg to master_eval.py parser**
 
 Add to `get_parser()`:
 
@@ -1247,7 +1247,7 @@ def main(args: Namespace) -> None:
     pipe_config, _ = load_config(args.config)
 ```
 
-- [ ] **Step 2: Add --config arg to parallel_eval.py parser**
+- [x] **Step 2: Add --config arg to parallel_eval.py parser**
 
 Add to `get_arguments()`:
 
@@ -1280,12 +1280,12 @@ def main() -> None:
     gen_embeds(model, args.exp_dir, args.imdir, args)
 ```
 
-- [ ] **Step 3: Verify both files**
+- [x] **Step 3: Verify both files**
 
 Run: `python -m py_compile src/master_eval.py && python -m py_compile src/parallel_eval.py`
 Expected: no errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/master_eval.py src/parallel_eval.py
@@ -1297,7 +1297,7 @@ git commit -m "feat: integrate config module into master_eval and parallel_eval"
 **Files:**
 - Modify: `src/decam_postage_stamps.py`
 
-- [ ] **Step 1: Replace env-var access with VisualizationConfig import**
+- [x] **Step 1: Replace env-var access with VisualizationConfig import**
 
 At the top, after `from . import decam_info`, add:
 
@@ -1326,12 +1326,12 @@ surveyccd_path_dr8 = _viz_config.surveyccd_path_dr8
 
 Note: `import os` is still needed for `os.path` operations inside functions.
 
-- [ ] **Step 2: Verify syntax**
+- [x] **Step 2: Verify syntax**
 
 Run: `python -m py_compile src/decam_postage_stamps.py`
 Expected: no error
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/decam_postage_stamps.py

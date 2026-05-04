@@ -1,18 +1,21 @@
+from __future__ import annotations
+
 import torch
 from torch.utils.data import DataLoader
 
 from . import decam_info
+from .config import load_config, PipelineConfig
 from .decam_dataset import DECamImageDataset
 
 from pathlib import Path
+import argparse
 import h5py
 import numpy as np
 import pandas as pd
 from torchvision import transforms
-import argparse
 
 
-def get_arguments():
+def get_arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Inference with trained model", add_help=False)
     parser.add_argument("--dset-path", type=Path, default="/path/to/imagenet", required=True,
                         help='Path to the *.csv file')
@@ -29,12 +32,14 @@ def get_arguments():
                        help="crop size for the five crops on the image")
     
     parser.add_argument("--num-workers", type=int, default=2,
-                       help="Number of workers to load data")
+                        help="Number of workers to load data")
     parser.add_argument("--gpu-idx", type=int, default=0,
-                       help="GPU index to use")
+                        help="GPU index to use")
+    parser.add_argument("--config", type=str, default=None,
+                        help='Path to YAML config file')
     return parser
 
-def split_dset(dset_path, dst_dir, num_parts, keep_index=True):
+def split_dset(dset_path: str | Path, dst_dir: str | Path, num_parts: int, keep_index: bool = True) -> None:
     # num_gpu = torch.cuda.device_count()
     tmp_dir = dst_dir #/ 'tmp'
     tmp_dir.mkdir(exist_ok=True, parents=True)
@@ -50,7 +55,7 @@ def split_dset(dset_path, dst_dir, num_parts, keep_index=True):
             tmp_df.insert(0, "original_df_idx", tmp_df.index)
         tmp_df.to_csv(tmp_dir / f"{i}_worker_sample.csv", index=False)
 
-def create_model(BACKBONE_SIZE, use_register=True):
+def create_model(BACKBONE_SIZE: str, use_register: bool = True) -> torch.nn.Module:
     # BACKBONE_SIZE = "base" # in ("small", "base", "large" or "giant")
     backbone_archs = {
         "small": "vits14",
@@ -68,7 +73,7 @@ def create_model(BACKBONE_SIZE, use_register=True):
     model.eval()
     return model
 
-def gen_embeds(model, exp_dir, imdir, args):
+def gen_embeds(model: torch.nn.Module, exp_dir: str | Path, imdir: str | Path, args: argparse.Namespace) -> None:
     # data_dir = root_dir / "data"
     ckpt_dir = exp_dir / "checkpoint"
     # test_dir = data_dir / "test"
@@ -88,6 +93,9 @@ def gen_embeds(model, exp_dir, imdir, args):
         print("Using GPU")
         gpu = torch.device("cuda", args.gpu_idx)
         model = model.cuda(gpu)
+    else:
+        gpu = None
+        print("Using CPU")
 
     # (2046 // 14) * 14 = 2044
     # (4096 // 14) * 14 = 4088
@@ -134,9 +142,15 @@ if __name__ == "__main__":
     main()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser('Generate feature vector with trained models', parents=[get_arguments()])
     args = parser.parse_args()
+    if args.config:
+        pipe_config, _ = load_config(args.config)
+        if pipe_config.image_dir and not args.imdir:
+            args.imdir = pipe_config.image_dir
+    if not torch.cuda.is_available():
+        print("WARNING: No GPU detected. Inference will run on CPU (very slow).")
     print("Generating:")
     print(args)
     model = create_model(args.model_size, use_register=True)

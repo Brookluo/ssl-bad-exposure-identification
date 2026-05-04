@@ -18,6 +18,7 @@ from astropy.io import fits
 from scipy.ndimage.filters import gaussian_filter
 
 from . import decam_info
+from .config import VisualizationConfig, load_config
 from .decam_focalplane import (
     ccd_ra, ccd_dec, x_pix, y_pix,
     full_x_size as x_size, full_y_size as y_size,
@@ -35,10 +36,11 @@ plt.rcParams.update(params)
 ccdnamenumdict_inv = decam_info.ccdnum2name
 ccdnum_list = decam_info.ccdnum_li_m1
 
-image_dir = os.environ.get('DECAM_IMAGE_DIR', '')
-blob_dir = os.environ.get('DECAM_BLOB_DIR', '')
-surveyccd_path = os.environ.get('SURVEYCCD_PATH', '')
-surveyccd_path_dr8 = os.environ.get('SURVEYCCD_PATH_DR8', '')
+_viz_config, _ = load_config()
+image_dir = _viz_config.image_dir
+blob_dir = _viz_config.blob_dir
+surveyccd_path = _viz_config.surveyccd_path
+surveyccd_path_dr8 = _viz_config.surveyccd_path_dr8
 
 image_vrange = {'u':[-5, 5], 'g':[-5, 5], 'r':[-7, 7], 'i':[-10, 10], 'z':[-30, 30], 'Y':[-30, 30]}  # per 100s exposure time
 
