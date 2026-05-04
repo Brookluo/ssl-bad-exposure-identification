@@ -1,0 +1,12 @@
+# Core dependencies (required for embedding generation pipeline)
+torch>=2.0
+torchvision>=0.15
+h5py
+pandas
+numpy
+astropy
+fitsio
+
+# Optional dependencies (visualization and analysis)
+matplotlib
+scipy

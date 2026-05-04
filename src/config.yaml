@@ -1,18 +1,20 @@
-# Pipeline and visualization configuration.
-# Priority: CLI args > environment variables > YAML > defaults.
+# Configurable paths for embedding generation and visualization.
+# Set these via CLI args or environment variables; CLI args take precedence.
+#
+# Usage:
+#   python bin/master_eval --output-dir <out> --dset-path data/sample.csv --image-dir /path/to/images --dr dr11
 
-pipeline:
-  dset_path: null
-  image_dir: null
-  dr: dr11
-  cont: false
-  model_size: base
-  batch_size: 1
-  crop_size: [2352, 1176]
-  num_workers: 2
+# Image directory containing DECam FITS files (*.fits.fz)
+image_dir: null
 
+# Dataset CSV with columns: expnum, image_filename, image_hdu, reasons, vi_source
+dset_path: null
+
+# Data release: dr10 or dr11
+dr: dr11
+
+# Visualization paths (used by decam_postage_stamps.py)
 visualization:
-  image_dir: null
-  blob_dir: null
   surveyccd_path: null
   surveyccd_path_dr8: null
+  blob_dir: null

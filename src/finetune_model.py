@@ -1,4 +1,6 @@
-import sys
+# This file is incomplete — a skeleton for fine-tuning DINOv2 on DECam data.
+# Imports below are unused until the training loop is implemented.
+
 from pathlib import Path
 import matplotlib.pyplot as plt
 from argparse import ArgumentParser
@@ -12,8 +14,7 @@ from torch.utils.data import DataLoader
 from torch import nn, optim
 from torchvision import transforms
 
-sys.path.append("../src")
-import decam_info
+from . import decam_info
 
 
 def get_args():

@@ -8,7 +8,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import fitsio
 from astropy.visualization import ZScaleInterval
-import decam_info
+from . import decam_info
 import logging
 
 logger = logging.getLogger(__name__)

@@ -93,16 +93,17 @@ def init_distributed_mode(args):
 # from nersc_distributed.py
 def _get_sync_file():
     """Logic for naming sync file using slurm env variables"""
-    sync_file_dir = '%s/pytorch-sync-files' % os.environ['SCRATCH']
+    scratch = os.environ.get('SCRATCH', '/tmp')
+    sync_file_dir = f'{scratch}/pytorch-sync-files'
     os.makedirs(sync_file_dir, exist_ok=True)
     sync_file = 'file://%s/pytorch_sync.%s.%s' % (
-        sync_file_dir, os.environ['SLURM_JOB_ID'], os.environ['SLURM_STEP_ID'])
+        sync_file_dir, os.environ.get('SLURM_JOB_ID', 'local'), os.environ.get('SLURM_STEP_ID', '0'))
     return sync_file
 
 def init_workers_gloo_file():
     """Initialize workers with GLOO backend and sync file"""
-    rank = int(os.environ['SLURM_PROCID'])
-    n_ranks = int(os.environ['SLURM_NTASKS'])
+    rank = int(os.environ.get('SLURM_PROCID', os.environ.get('RANK', 0)))
+    n_ranks = int(os.environ.get('SLURM_NTASKS', os.environ.get('WORLD_SIZE', 1)))
     sync_file = _get_sync_file()
     dist.init_process_group(backend='gloo', world_size=n_ranks, rank=rank,
                             init_method=sync_file)
@@ -110,8 +111,8 @@ def init_workers_gloo_file():
 
 def init_workers_nccl_file():
     """Initialize workers with NCCL backend and sync file"""
-    rank = int(os.environ['SLURM_PROCID'])
-    n_ranks = int(os.environ['SLURM_NTASKS'])
+    rank = int(os.environ.get('SLURM_PROCID', os.environ.get('RANK', 0)))
+    n_ranks = int(os.environ.get('SLURM_NTASKS', os.environ.get('WORLD_SIZE', 1)))
     sync_file = _get_sync_file()
     print('Setting up with sync file', sync_file)
     dist.init_process_group(backend='nccl', world_size=n_ranks, rank=rank,
@@ -126,8 +127,8 @@ def init_workers_nccl_slurm():
         export MASTER_PORT=29500
         srun ...
     """
-    rank = int(os.environ['SLURM_PROCID'])
-    n_ranks = int(os.environ['SLURM_NTASKS'])
+    rank = int(os.environ.get('SLURM_PROCID', 0))
+    n_ranks = int(os.environ.get('SLURM_NTASKS', 1))
     dist.init_process_group(backend='nccl', world_size=n_ranks, rank=rank)
     return rank, n_ranks
 

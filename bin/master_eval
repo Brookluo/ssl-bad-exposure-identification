@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+# Add project root to sys.path so sibling imports work
+_project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_project_root))
+
+from src.master_eval import get_parser, main
+
+if __name__ == "__main__":
+    args = get_parser().parse_args()
+    main(args)
