@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Information for decam focal plane CCD positions and plotting
 """
 import pandas as pd
@@ -46,12 +48,12 @@ x_pix = [ 8498. , 12747. , 16996. ,  6373.5, 10622.5, 14871.5, 19120.5,
                   23369.5,  4249. ,  8498. , 12747. , 16996. , 21245. ,  6373.5,
                   10622.5, 14871.5, 19120.5,  8498. , 16996. ]
 y_pix = [    0,     0,     0,  2249,  2249,  2249,  2249,  4498,  4498,
-                   4498,  4498,  4498,  6747,  6747,  6747,  6747,  6747,  6747,
-                   8996,  8996,  8996,  8996,  8996,  8996, 11245, 11245, 11245,
-                  11245, 11245, 11245, 11245, 13494, 13494, 13494, 13494, 13494,
-                  13494, 13494, 15743, 15743, 15743, 15743, 15743, 15743, 17992,
-                  17992, 17992, 17992, 17992, 17992, 20241, 20241, 20241, 20241,
-                  20241, 22490, 22490, 22490, 22490, 24739, 24739]
+                  4498,  4498,  4498,  6747,  6747,  6747,  6747,  6747,  6747,
+                  8996,  8996,  8996,  8996,  8996,  8996, 11245, 11245, 11245,
+                 11245, 11245, 11245, 11245, 13494, 13494, 13494, 13494, 13494,
+                 13494, 13494, 15743, 15743, 15743, 15743, 15743, 15743, 17992,
+                 17992, 17992, 17992, 17992, 17992, 20241, 20241, 20241, 20241,
+                 20241, 22490, 22490, 22490, 22490, 24739, 24739]
 
 img_shape = (4094, 2046)
 pix_size = 0.262/3600
@@ -61,8 +63,14 @@ fp_ccd_pos = pd.DataFrame(zip(ccd_ra, ccd_dec, x_pix, y_pix),
              index=decam_info.ccdnum_li_m1)
 
 
-def plot_decam_exposure(exp_path, fig, vrange=None, cmap='gray',
-                        ood_mask=False, median=False, binsize=20):
+def plot_decam_exposure(
+    exp_path: str | Path, fig,
+    vrange: tuple[float, float] | None = None,
+    cmap: str = 'gray',
+    ood_mask: bool = False,
+    median: bool = False,
+    binsize: int = 20,
+) -> None:
     # header = fitsio.read_header(exp_path)
     # exptime = header['EXPTIME']
     with fitsio.FITS(exp_path) as imgfits:
@@ -129,7 +137,9 @@ def plot_decam_exposure(exp_path, fig, vrange=None, cmap='gray',
     # return fig
 
 
-def assemble_focal_plane(exp_path: "str | Path", outfile=None):
+def assemble_focal_plane(
+    exp_path: str | Path, outfile: str | Path | None = None,
+) -> np.ndarray:
     # exp_path: full path to the exposure
     logger.info("Loading exposure: %s", exp_path)
     with fitsio.FITS(exp_path) as imgfits:

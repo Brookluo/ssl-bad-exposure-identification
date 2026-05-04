@@ -1,5 +1,6 @@
-# Provide info for DECam exposures
-from typing import Iterable, List
+from __future__ import annotations
+
+from typing import Iterable
 
 
 ccdname2num = {
@@ -81,8 +82,6 @@ ccdnum_li_m2 = tuple(ccdnum_li_m2)
 def is_miss_2ccd(mjd_obs: float):
     from astropy.time import Time
 
-    # matched = tab[tab["expnum"] == expnum]
-    # assert len(matched) > 0, f"expnum {expnum} not found in the table"
     return (
         True
         if (
@@ -145,7 +144,7 @@ reason_source_dict = {"Rongpu": 1, "Alex": 2}
 filter_dict = {"g": 1, "r": 2, "i": 3, "z": 4, "Y": 5}
 
 
-def decode_reason(bit_reason: int, return_num=False):
+def decode_reason(bit_reason: int, return_num: bool = False) -> list[str | int]:
     """Decode the bitmask for issues with this exposure
 
     Params:
@@ -165,13 +164,13 @@ def decode_reason(bit_reason: int, return_num=False):
     return [reason_list[i] for i in range(len(reason_list)) if 2**i & bit_reason]
 
 
-def decode_vi_source(bit_source):
+def decode_vi_source(bit_source: int) -> list[str]:
     # if reason_source_dict is None:
     # reason_source_dict = reason_source
     return [name for name, i in reason_source_dict.items() if 2**i & bit_source]
 
 
-def decode_ml_label(ml_label: Iterable) -> List:
+def decode_ml_label(ml_label: Iterable[int]) -> list[str]:
     """Decode the machine learning model generated labels
 
     Params:

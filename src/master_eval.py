@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import subprocess
 from pathlib import Path
 from argparse import Namespace, ArgumentParser
@@ -8,7 +10,7 @@ import torch
 from parallel_eval import split_dset
 
 
-def get_parser():
+def get_parser() -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument("-dir", "--output-dir", type=str, required=True,
                             help='full directory path')
@@ -21,7 +23,7 @@ def get_parser():
     return parser
 
 
-def main(args):
+def main(args: Namespace) -> None:
     num_gpu = torch.cuda.device_count()
     output_dir = Path(args.output_dir)
     worker_dset_dir = output_dir / "tmp"
@@ -79,4 +81,3 @@ if __name__ == "__main__":
     parser = get_parser()
     args = parser.parse_args()
     main(args)
-    

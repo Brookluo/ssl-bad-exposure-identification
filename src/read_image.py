@@ -1,28 +1,18 @@
+from __future__ import annotations
+
 from pathlib import Path
 import logging
 import numpy as np
 from astropy.io import fits
-from typing import Union
 
 
 logger = logging.getLogger(__name__)
 
 
-def read_image(image_path: Union[Path, str], padding):
-    """Read an image from the given file path. The file format must be either .fits.gz or .npz.
-    Note the .npz file is constructed from a .fits.gz exposure file.
-
-    Args:
-        image_path (Union[Path, str]): The path to the image file.
-        padding (bool): the padding parameter passed on to the read_img_fits function.
-
-    Returns:
-        numpy.ndarray: The image data.
-
-    Raises:
-        ValueError: If the image format is unknown.
-    """
+def read_image(image_path: str | Path, padding: bool) -> tuple[np.ndarray, list[str]]:
     image_path = Path(image_path)
+    if not image_path.exists():
+        raise FileNotFoundError(f"Image file not found: {image_path}")
     if "fits" in image_path.name:
         logger.debug("Reading FITS image from %s", image_path)
         return read_img_fits(image_path, padding)
@@ -33,23 +23,11 @@ def read_image(image_path: Union[Path, str], padding):
         raise ValueError(f"Unknown image format: {image_path.suffix}")
 
 
-def read_img_fits(image_path, padding=False):
-    """Read a FITS image file and extract image data for each CCD. The image data is divided in half
-    and formatted to be square either via trimming or padding.
-
-    Args:
-        image_path (Union[Path, str]): The path to the FITS image file.
-        padding (bool): if true, adding a row/column of empty pixel to each side to expand the image to (4096, 2048).
-            Else, trimming the image -> removing a row from bottom and top
-    Returns:
-        tuple: A tuple containing the half-sized image data for each CCD and a list of CCD names.
-
-    """
+def read_img_fits(image_path: str | Path, padding: bool = False) -> tuple[np.ndarray, list[str]]:
     img_shape = (4094, 2046)
     half_size = 2046 if not padding else 2048
-    ccdnames = []
+    ccdnames: list[str] = []
     with fits.open(image_path, memmap=True) as hdul:
-        # remove a row from top and bottom of the image to keep half image a square
         num_ccd = len(hdul) - 1
         half_imdata = np.zeros(
             (num_ccd * 2, half_size, half_size), dtype=np.float32
@@ -65,7 +43,7 @@ def read_img_fits(image_path, padding=False):
     return half_imdata, ccdnames
 
 
-def save_img_npz(image_path: Union[Path, str], outdir: Union[Path, str]):
+def save_img_npz(image_path: str | Path, outdir: str | Path) -> Path:
     image_path = Path(image_path)
     outdir = Path(outdir)
     half_imdata, ccdnames = read_img_fits(image_path)
@@ -74,19 +52,10 @@ def save_img_npz(image_path: Union[Path, str], outdir: Union[Path, str]):
     return outdir / new_img_name
 
 
-def read_img_npz(image_path):
-    """Read image data from a .npz file.
-
-    Args:
-        image_path (str): The path to the .npz file.
-
-    Returns:
-        half_imdata (numpy.ndarray): The image data where each CCD is divided in half to be square.
-        img_names (numpy.ndarray): The names of the images.
-    """
+def read_img_npz(image_path: str | Path) -> tuple[np.ndarray, np.ndarray]:
     data = np.load(image_path)
-    ccdnames = data["ccdnames"]
-    half_imdata = data["half_imdata"]
+    ccdnames: np.ndarray = data["ccdnames"]
+    half_imdata: np.ndarray = data["half_imdata"]
     return half_imdata, ccdnames
 
 

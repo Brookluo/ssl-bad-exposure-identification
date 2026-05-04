@@ -1,20 +1,22 @@
+from __future__ import annotations
+
 import torch
+from pathlib import Path
 from torch.utils.data import DataLoader
+import argparse
 
 # import sys
 # sys.path.append("../src")
 import decam_info
 from decam_dataset import DECamImageDataset
 
-from pathlib import Path
 import h5py
 import numpy as np
 import pandas as pd
 from torchvision import transforms
-import argparse
 
 
-def get_arguments():
+def get_arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Inference with trained model", add_help=False)
     parser.add_argument("--dset-path", type=Path, default="/path/to/imagenet", required=True,
                         help='Path to the *.csv file')
@@ -36,7 +38,8 @@ def get_arguments():
                        help="GPU index to use")
     return parser
 
-def split_dset(dset_path, dst_dir, num_parts, keep_index=True):
+
+def split_dset(dset_path: str | Path, dst_dir: str | Path, num_parts: int, keep_index: bool = True) -> None:
     # num_gpu = torch.cuda.device_count()
     tmp_dir = dst_dir #/ 'tmp'
     tmp_dir.mkdir(exist_ok=True, parents=True)
@@ -52,7 +55,8 @@ def split_dset(dset_path, dst_dir, num_parts, keep_index=True):
             tmp_df.insert(0, "original_df_idx", tmp_df.index)
         tmp_df.to_csv(tmp_dir / f"{i}_worker_sample.csv", index=False)
 
-def create_model(BACKBONE_SIZE, use_register=True):
+
+def create_model(BACKBONE_SIZE: str, use_register: bool = True) -> torch.nn.Module:
     # BACKBONE_SIZE = "base" # in ("small", "base", "large" or "giant")
     backbone_archs = {
         "small": "vits14",
@@ -70,7 +74,8 @@ def create_model(BACKBONE_SIZE, use_register=True):
     model.eval()
     return model
 
-def gen_embeds(model, exp_dir, imdir, args):
+
+def gen_embeds(model: torch.nn.Module, exp_dir: str | Path, imdir: str | Path, args: argparse.Namespace) -> None:
     # data_dir = root_dir / "data"
     ckpt_dir = exp_dir / "checkpoint"
     # test_dir = data_dir / "test"
@@ -132,10 +137,14 @@ def gen_embeds(model, exp_dir, imdir, args):
                     h5f['images'].create_dataset(name, data=embeds, dtype='float')
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser('Generate feature vector with trained models', parents=[get_arguments()])
     args = parser.parse_args()
     print("Generating:")
     print(args)
     model = create_model(args.model_size, use_register=True)
     gen_embeds(model, args.exp_dir, args.imdir, args)
+
+
+if __name__ == "__main__":
+    main()

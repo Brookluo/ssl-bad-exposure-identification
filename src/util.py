@@ -1,19 +1,22 @@
-# util.py
-# Utility functions for processing the images
+from __future__ import annotations
 
-def get_info_from_html(html_path):
-    # parse the html webpage from Frank
-    # html is in a table format
-    # meta = []
-    # img_src = []
-    entry = []
-    with open(html_path, 'r') as f:
-        # first_entry = [] # meta
-        # second_entry = [] # img_src
-        count = 0
+from pathlib import Path
+from typing import Any
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def get_info_from_html(html_path: str | Path) -> list[list[str]]:
+    entry: list[list[str]] = []
+    try:
+        f = open(html_path, 'r')
+    except (FileNotFoundError, IsADirectoryError) as e:
+        logger.warning("Cannot read HTML file %s: %s", html_path, e)
+        return entry
+    with f:
         for l in f:
             l = l.strip()
-            # print(l)
             if l.startswith("<table>") or l.startswith("</table>"):
                 if "<td>" not in l:
                     continue
@@ -26,10 +29,16 @@ def get_info_from_html(html_path):
     return entry
 
 
-def make_webpage(master_list, pack_idx, root_dir, base_name, num_element=400):
+def make_webpage(
+    master_list: list[Any],
+    pack_idx: list[int],
+    root_dir: str | Path,
+    base_name: str,
+    num_element: int = 400,
+) -> None:
     count = 0
     base_tmpl = "<table>\n{}\n</table>\n"
-    content = []
+    content: list[str] = []
     start_exp = -1
     for i, idx in enumerate(pack_idx):
         if start_exp == -1:
