@@ -14,6 +14,7 @@ import fitsio
 from astropy.io import fits
 
 from scipy.ndimage.filters import gaussian_filter
+from config import VisualizationConfig, load_config
 
 params = {'legend.fontsize': 'large',
           'axes.labelsize': 'large',
@@ -94,12 +95,11 @@ y_pix = np.array([    0,     0,     0,  2249,  2249,  2249,  2249,  4498,  4498,
 img_shape = (4094, 2046)
 pix_size = 0.262/3600
 
-image_dir = '/global/cfs/cdirs/cosmo/staging'
-blob_dir = '/global/cfs/cdirs/desi/users/rongpu/dr9/decam_ccd_blob_mask'
-# surveyccd_path = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9m/survey-ccds-decam-dr9.fits.gz'
-# surveyccd_path_dr8 = '/global/cfs/cdirs/cosmo/work/legacysurvey/dr9-garage/reorg/decam/survey-ccds-decam-dr8-newlocs2.fits.gz'
-surveyccd_path = '/global/cfs/cdirs/desi/users/rongpu/useful/survey-ccds-decam-dr9-trim.fits'
-surveyccd_path_dr8 = '/global/cfs/cdirs/desi/users/rongpu/useful/survey-ccds-decam-dr8-trim.fits'
+_viz_config, _ = load_config()
+image_dir = _viz_config.image_dir
+blob_dir = _viz_config.blob_dir
+surveyccd_path = _viz_config.surveyccd_path
+surveyccd_path_dr8 = _viz_config.surveyccd_path_dr8
 
 image_vrange = {'u':[-5, 5], 'g':[-5, 5], 'r':[-7, 7], 'i':[-10, 10], 'z':[-30, 30], 'Y':[-30, 30]}  # per 100s exposure time
 

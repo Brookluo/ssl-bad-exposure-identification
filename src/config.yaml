@@ -1,24 +1,18 @@
-data:
-    dset_path: path
-    batch_size: 4
-    crop_scale:
-        - 14*168
-        - 14*84
-    crop_size: 224
-    num_workers: 10
-    pin_mem: true
-    num_patch: 20
-    drop_idx: 0, 3, 10, 11 # these are the indices rejected in data making process
-logging:
-    folder: /persistence/world_models/
-    log_freq_time: 60
-training:
-    model_size: base
-    use_register: true
-    exp_dir: 
-    epochs: 50
-distributed:
-    backend: nccl
-    device: cuda
-    
-  
+# Pipeline and visualization configuration.
+# Priority: CLI args > environment variables > YAML > defaults.
+
+pipeline:
+  dset_path: null
+  image_dir: null
+  dr: dr11
+  cont: false
+  model_size: base
+  batch_size: 1
+  crop_size: [2352, 1176]
+  num_workers: 2
+
+visualization:
+  image_dir: null
+  blob_dir: null
+  surveyccd_path: null
+  surveyccd_path_dr8: null

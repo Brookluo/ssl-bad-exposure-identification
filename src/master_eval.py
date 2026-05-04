@@ -8,6 +8,7 @@ import sys
 import pandas as pd
 import torch
 from parallel_eval import split_dset
+from config import load_config, PipelineConfig
 
 
 def get_parser() -> ArgumentParser:
@@ -20,10 +21,13 @@ def get_parser() -> ArgumentParser:
                        help='which data release to use')
     parser.add_argument("--cont", action="store_true",
                         help='Whether to contine last inferencing')
+    parser.add_argument("--config", type=str, default=None,
+                        help='Path to YAML config file')
     return parser
 
 
 def main(args: Namespace) -> None:
+    pipe_config, _ = load_config(args.config)
     num_gpu = torch.cuda.device_count()
     output_dir = Path(args.output_dir)
     worker_dset_dir = output_dir / "tmp"

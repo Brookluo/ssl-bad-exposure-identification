@@ -9,6 +9,7 @@ import argparse
 # sys.path.append("../src")
 import decam_info
 from decam_dataset import DECamImageDataset
+from config import load_config, PipelineConfig
 
 import h5py
 import numpy as np
@@ -30,12 +31,14 @@ def get_arguments() -> argparse.ArgumentParser:
     parser.add_argument("--batch-size", type=int, default=2, required=True,
                         help='batch size for inferencing')
     parser.add_argument("--crop-size", nargs=2, default=(1540, 1540), type=int,
-                       help="crop size for the five crops on the image")
-    
+                        help="crop size for the five crops on the image")
+
     parser.add_argument("--num-workers", type=int, default=2,
-                       help="Number of workers to load data")
+                        help="Number of workers to load data")
     parser.add_argument("--gpu-idx", type=int, default=0,
-                       help="GPU index to use")
+                        help="GPU index to use")
+    parser.add_argument("--config", type=str, default=None,
+                        help='Path to YAML config file')
     return parser
 
 
@@ -143,6 +146,10 @@ def gen_embeds(model: torch.nn.Module, exp_dir: str | Path, imdir: str | Path, a
 def main() -> None:
     parser = argparse.ArgumentParser('Generate feature vector with trained models', parents=[get_arguments()])
     args = parser.parse_args()
+    if args.config:
+        pipe_config, _ = load_config(args.config)
+        if pipe_config.image_dir and not args.imdir:
+            args.imdir = pipe_config.image_dir
     if not torch.cuda.is_available():
         print("WARNING: No GPU detected. Inference will run on CPU (very slow).")
     print("Generating:")
