@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "ssl-bad-exposure-identification"
+version = "0.1.0"
+description = "Semi-Supervised Learning for Bad Exposures in Large Imaging Surveys"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.0",
+    "torchvision>=0.15",
+    "h5py",
+    "pandas",
+    "numpy",
+    "astropy",
+    "fitsio",
+]
+
+[project.optional-dependencies]
+viz = ["matplotlib", "scipy"]
+dev = ["pytest", "pytest-cov"]
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[project.scripts]
+master-eval = "src.master_eval:main"
