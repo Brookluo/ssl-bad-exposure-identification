@@ -26,9 +26,7 @@ import astropy.units as u
 from pathlib import Path
 
 # %%
-import sys
-sys.path.append("../src/")
-import decam_info
+from decam_qa import reason_li, ccdnum2name
 
 # %%
 dr11_dir = Path('/global/cfs/cdirs/cosmo/work/legacysurvey/dr11')
@@ -308,11 +306,11 @@ entry_expnum = []
 for i, et in enumerate(mod_entry):
     exp = int(et[1])
     rows = selected.query("expnum==@exp")
-    reasons = [decam_info.reason_li[l] if l > 0 else "good" for l in rows["ml_label"]]
+    reasons = [reason_li[l] if l > 0 else "good" for l in rows["ml_label"]]
     entry_rea.append(list(np.unique(reasons)))
     entry_expnum.append(exp)
     probs = rows["ml_prob"]
-    ccdnames = [decam_info.ccdnum2name[num] for num in rows["ccdnum"]]
+    ccdnames = [ccdnum2name[num] for num in rows["ccdnum"]]
     idxs = np.where(lo_lat_expnum == exp)[0]
     if len(idxs):
         idx = idxs[0]

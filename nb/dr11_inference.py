@@ -29,11 +29,10 @@ from astropy.table import Table
 import fitsio
 
 # %%
-sys.path.append("../src")
-import decam_info
+from decam_qa import reason_li
 
 # %%
-from inference import read_embeds
+from decam_qa import read_embeddings
 
 # %% [markdown]
 # # Check the model performance
@@ -41,7 +40,7 @@ from inference import read_embeds
 # %%
 # load train data from last train
 train_dir = Path("/pscratch/sd/b/brookluo/decam-exposure/dino_v2/base_resize_dr10cut/train")
-train_data, train_idx, train_label = read_embeds(train_dir / "eval/embeds_out")
+train_data, train_idx, train_label = read_embeddings(train_dir / "eval/embeds_out")
 train_embeds = np.vstack(train_data) #[np.mean(it, axis=0) for it in train_data]) for five crop instead of resize
 
 # %%
@@ -76,7 +75,7 @@ def calculate_accuracy_per_class(y_true, y_pred):
     num = 0
     label_name = ["0_good"]
     print(num, "good", score)
-    for i, rea in enumerate(decam_info.reason_li, start=1):
+    for i, rea in enumerate(reason_li, start=1):
         if sum(y_true==i) == 0:
             continue
         num += 1
@@ -142,7 +141,7 @@ for i in range(16):
     pred_prob = np.full(len(df), fill_value=-1, dtype=float)
     # data, idx, label = read_embeds(path_tmpl.format(i))
     print(i)
-    data, idx, label = read_embeds(path_tmpl.format(i))
+    data, idx, label = read_embeddings(path_tmpl.format(i))
     data = np.vstack(data)
     idx = np.array(idx, dtype=int)
     #[np.mean(it, axis=0) for it in train_data]) for five crop instead of resize

@@ -24,11 +24,8 @@ import numpy as np
 from astropy.table import Table
 
 # %%
-import sys
-sys.path.append("../src/")
-
 # %%
-from util import get_info_from_html, make_webpage
+from decam_qa.utils import get_info_from_html, make_webpage
 
 # %%
 vidir = Path("/global/u1/b/brookluo/decam-exposure-quality/data/vi")

@@ -14,15 +14,11 @@
 
 # %%
 import sys
-sys.path.append("../src")
-sys.path.append("/global/homes/b/brookluo/.local/perlmutter/pytorch2.6.0/lib/python3.12/site-packages")
-import decam_info
-from decam_dataset import DECamImageDataset
+from decam_qa import reason_li, reason_num_dict, ccdnum2name, decode_reason, DECamImageDataset, read_embeddings
 
 # %%
 sys.path.append("../../img-spec-ml/src/")
 from plot_utils import plot_zscale_image
-from inference import read_embeds
 
 # %%
 import matplotlib.pyplot as plt
@@ -58,7 +54,7 @@ plot_dir = eval_dir / "plots"
 plot_dir.mkdir(exist_ok=True)
 
 # %%
-train_data, train_idx, train_label = read_embeds(exp_dir / "node0/embeds_out")
+train_data, train_idx, train_label = read_embeddings(exp_dir / "node0/embeds_out")
 train_embeds = np.vstack([np.mean(it, axis=0) for it in train_data])
 
 # %%
@@ -75,7 +71,7 @@ train_label = np.array(train_label, dtype=int)
 np.unique(train_label, return_counts=True, )
 
 # %%
-# test_data, test_idx, test_label = read_embeds(test_dir)
+# test_data, test_idx, test_label = read_embeddings(test_dir)
 # test_embeds = np.vstack([np.mean(it, axis=0) for it in test_data])
 
 # %%
@@ -182,13 +178,13 @@ plot_dir.mkdir(exist_ok=True)
 
 # all_labels = []
 # for i in idx:
-#     reasons = decam_info.decode_reason(dataset.df_data['reasons'].iloc[i], return_num=True)
+#     reasons = decode_reason(dataset.df_data['reasons'].iloc[i], return_num=True)
 #     if len(reasons) == 0:
 #         lab = 0
 #     else:
 #         lab = reasons[0] + 1
 #     all_labels.append(lab)
-# # all_labels = np.array([decam_info.decode_reason(dataset.df_data['reasons'].iloc[i], return_num=True)[0] for i in idx])
+# # all_labels = np.array([decode_reason(dataset.df_data['reasons'].iloc[i], return_num=True)[0] for i in idx])
 # all_labels = np.array(all_labels)
 
 # %%
@@ -203,7 +199,7 @@ import plotly.graph_objects as go
 
 # import pandas as pd
 
-# df = pd.DataFrame(tsne_all, columns=["good", *decam_info.reason_li[1:]])
+# df = pd.DataFrame(tsne_all, columns=["good", *reason_li[1:]])
 
 # fig = px.scatter_3d(x=tsne_all[label==0, 0], y=tsne_all[label==0, 1], z=tsne_all[label==0, 2],
 #         marker=dict(
@@ -228,7 +224,7 @@ fig.add_trace(go.Scatter3d(
     name='good'
 ))
 
-for i, rea in enumerate(decam_info.reason_li, start=1):
+for i, rea in enumerate(reason_li, start=1):
     if sum(label==i) == 0:
         continue
     # ax[num].scatter(tsne_all[label!=i, 0], tsne_all[label!=i, 1], s=2, c="gray", alpha=0.5)
@@ -252,7 +248,7 @@ for i, rea in enumerate(decam_info.reason_li, start=1):
         name=rea
     ))
 # i = 5
-# rea = decam_info.reason_li[6]
+# rea = reason_li[6]
 # fig.add_trace(go.Scatter3d(
 #     x=tsne_all[label==i, 0],
 #     y=tsne_all[label==i, 1],
@@ -286,7 +282,7 @@ fig.update_layout(
 # fig.show()
 
 # %%
-decam_info.reason_li
+reason_li
 
 # %% [markdown]
 # ## Make 3D plot
@@ -297,11 +293,11 @@ fig = plt.figure(figsize=(15, 15))
 ax = fig.add_subplot(projection='3d')
 # ax.scatter(tsne_all[label==0, 0], tsne_all[label==0, 1], tsne_all[label==0, 2], s=2, label="good")
 ax.scatter(tsne_all[label==0, 0], tsne_all[label==0, 1], tsne_all[label==0, 2], s=2, label="good")
-# for i, rea in enumerate(decam_info.reason_li, start=1):
+# for i, rea in enumerate(reason_li, start=1):
     # if sum(label==i) == 0:
         # continue
 i = 6
-rea = decam_info.reason_li[i]
+rea = reason_li[i]
 ax.scatter(tsne_all[label==i, 0], tsne_all[label==i, 1], tsne_all[label==i, 2], s=2, label=rea)
 ax.set_aspect("equal")
 ax.set_xlabel("tSNE axis-1")
@@ -369,7 +365,7 @@ ax[num].set_aspect("equal")
 ax[num].set_title("Good", fontsize=20)
 ax[num].tick_params(axis='both', labelsize=16)
 num += 1
-for i, rea in enumerate(decam_info.reason_li, start=1):
+for i, rea in enumerate(reason_li, start=1):
     if sum(label==i) == 0:
         continue
     ax[num].scatter(tsne_all[label!=i, 0], tsne_all[label!=i, 1], s=2, c="gray", alpha=0.5)
@@ -470,7 +466,7 @@ y_test_cut = y_test[y_cut]
 y_pred_cut = y_pred_label[y_cut]
 
 # %%
-reason_li = ["good"] + list(decam_info.reason_li[1:])
+reason_li = ["good"] + list(reason_li[1:])
 # reason_li = np.array(reason_li)[np.unique(label)]
 # ooi_counts = []
 # for i, rea in enumerate(reason_li):
@@ -520,7 +516,7 @@ score = pipe.score(X_test_cut[pick], y_test_cut[pick])
 num = 0
 label_name = ["0_good"]
 print(num, "good", score)
-for i, rea in enumerate(decam_info.reason_li, start=1):
+for i, rea in enumerate(reason_li, start=1):
     if sum(label==i) == 0:
         continue
     num += 1
@@ -584,7 +580,7 @@ df_test = pd.read_csv("/global/u1/b/brookluo/decam-exposure-quality/data/samples
 df_train = pd.read_csv("/global/u1/b/brookluo/decam-exposure-quality/data/samples/train_supervised_ooi_dataset.csv")
 
 # %%
-all_reasons = df_test.iloc[test_idx[y_cut][y_pred_cut == 15]]['reasons'].apply(decam_info.decode_reason)
+all_reasons = df_test.iloc[test_idx[y_cut][y_pred_cut == 15]]['reasons'].apply(decode_reason)
 
 # %%
 df_test.iloc[test_idx[y_cut][y_pred_cut == 15]].query("expnum == 468244")
@@ -648,7 +644,7 @@ lgnd = ax[num].legend(loc="upper right", scatterpoints=1, fontsize=10)
 for hdl in lgnd.legendHandles:
     hdl._sizes = [30]
 num += 1
-for i, rea in enumerate(decam_info.reason_li, start=1):
+for i, rea in enumerate(reason_li, start=1):
     if sum(label==i) == 0:
         continue
     ax[num].scatter(tsne_all[label_all!=i, 0], tsne_all[label_all!=i, 1], s=2, c="gray", alpha=0.5)
@@ -671,7 +667,7 @@ for i, rea in enumerate(decam_info.reason_li, start=1):
 
 # %%
 # # now check miss classified 0 vs. 5 (7) (good vs. ghost_scatter case)
-# # decam_info.reason_num_dict['Ghost_Scatter'] == 6 (+1)
+# # reason_num_dict['Ghost_Scatter'] == 6 (+1)
 # miss_class_0 = (y_test == 7) & (y_pred == 0)
 # miss_class_5 = (y_test == 0) & (y_pred == 7)
 # idx_miss_0 = np.array(test_idx, dtype=int)[miss_class_0]
@@ -708,7 +704,7 @@ label = np.array(test_label, dtype=int)
 row = df_test.query("expnum == 453898").iloc[0]
 exp = row.expnum
 ccdnum = row.ccdnum
-ccdname = decam_info.ccdnum2name[ccdnum]
+ccdname = ccdnum2name[ccdnum]
 expheader = fitsio.read_header(dr10_imdir / row["image_filename"])
 img, imgheader = fitsio.read(dr10_imdir / row["image_filename"], ext=row["image_hdu"], header=True)
 fig, ax = plt.subplots(figsize=(6, 8))
@@ -720,8 +716,8 @@ ax.set_title(f"{exp} {ccdname}\n"
 print(imgheader['RDNOISEA'], imgheader['RDNOISEB'])
 print(imgheader['GAINA'], imgheader['GAINB'])
 print(expheader['EXPTIME'], expheader['FILTER'][:1])
-# print(decam_info.reason_li[y_pred_cut[pick_fp][i]-1])
-print(decam_info.decode_reason(row['reasons']))
+# print(reason_li[y_pred_cut[pick_fp][i]-1])
+print(decode_reason(row['reasons']))
 
 # %%
 idx_cut_match = idx_cut[pick_match]
@@ -744,14 +740,14 @@ all_match_pick_100 = [rng.choice(arr, size=100, replace=False) if len(arr) > 100
 #         row = df_test.iloc[idx_cut_match[i]]
 #         exp = row.expnum
 #         ccdnum = row.ccdnum
-#         ccdname = decam_info.ccdnum2name[ccdnum]
-#         all_reason = " & ".join(decam_info.decode_reason(row.reasons))
-#         all_source = " & ".join(decam_info.decode_vi_source(row.vi_source))
+#         ccdname = ccdnum2name[ccdnum]
+#         all_reason = " & ".join(decode_reason(row.reasons))
+#         all_source = " & ".join(decode_vi_source(row.vi_source))
 #         if y_pred_cut[pick_fp][i] == 0:
 #             reason = 'good'
 #             all_reason_source = 'good'
 #         else:
-#             reason = decam_info.reason_li[y_cut_match[i]-1]
+#             reason = reason_li[y_cut_match[i]-1]
 #             all_reason_source = f"{all_reason} by {all_source}"
 #         dir_rea = Path("/global/u1/b/brookluo/decam-exposure-quality/matched_images", reason)
 #         dir_rea.mkdir(exist_ok=True, parents=True)
@@ -785,10 +781,10 @@ for i in range(len(idx_cut[pick_fp])):
     row = df_test.iloc[idx_cut[pick_fp][i]]
     exp = row.expnum
     ccdnum = row.ccdnum
-    ccdname = decam_info.ccdnum2name[ccdnum]
-    # all_reason = " & ".join(decam_info.decode_reason(row.reasons))
-    # all_source = " & ".join(decam_info.decode_vi_source(row.vi_source))
-    reason = decam_info.reason_li[y_pred_cut[pick_fp][i]-1]
+    ccdname = ccdnum2name[ccdnum]
+    # all_reason = " & ".join(decode_reason(row.reasons))
+    # all_source = " & ".join(decode_vi_source(row.vi_source))
+    reason = reason_li[y_pred_cut[pick_fp][i]-1]
     # all_reason_source = f"{all_reason} by {all_source}"
     dir_rea = Path(dir_path, reason)
     dir_rea.mkdir(exist_ok=True, parents=True)
@@ -841,7 +837,7 @@ for onedir in dirpath.glob("*"):
 # for i, (idx, row) in enumerate(df_test.iloc[idx[y_cut][pick_fp]].iterrows()):
 #     exp = row.expnum
 #     ccdnum = row.ccdnum
-#     ccdname = decam_info.ccdnum2name[ccdnum]
+#     ccdname = ccdnum2name[ccdnum]
 #     fname = f"{exp}_{ccdname}.png"
 #     if i % 5 == 0:
 #         body.append("<tr>")
@@ -863,7 +859,7 @@ index = '''<!DOCTYPE html>
 </html>
 '''
 
-all_reason = [f'<li><a href="./{r}.html">{r}</a></li>' for r in (["good"] + list(decam_info.reason_li)) if r in os.listdir(dirpath)]
+all_reason = [f'<li><a href="./{r}.html">{r}</a></li>' for r in (["good"] + list(reason_li)) if r in os.listdir(dirpath)]
 with open(dirpath / "index.html", "w") as fp:
     fp.write(index.format(list="\n".join(all_reason)))
 
@@ -881,9 +877,9 @@ with open(dirpath / "index.html", "w") as fp:
 #     row = df_test.loc[idx_miss_0[i]]
 #     exp = row.expnum
 #     ccdnum = row.ccdnum
-#     ccdname = decam_info.ccdnum2name[ccdnum]
-#     all_reason = " & ".join(decam_info.decode_reason(row.reasons))
-#     all_source = " & ".join(decam_info.decode_vi_source(row.vi_source))
+#     ccdname = ccdnum2name[ccdnum]
+#     all_reason = " & ".join(decode_reason(row.reasons))
+#     all_source = " & ".join(decode_vi_source(row.vi_source))
 #     img = fitsio.read(dr10_imdir / row["image_filename"], ext=row["image_hdu"])
 #     fig, ax = plt.subplots(figsize=(6, 8))
 #     plot_zscale_image(img, ax, 'gray')
@@ -898,9 +894,9 @@ with open(dirpath / "index.html", "w") as fp:
 #     row = df_test.loc[idx_miss_5[i]]
 #     exp = row.expnum
 #     ccdnum = row.ccdnum
-#     ccdname = decam_info.ccdnum2name[ccdnum]
-#     all_reason = " & ".join(decam_info.decode_reason(row.reasons))
-#     all_source = " & ".join(decam_info.decode_vi_source(row.vi_source))
+#     ccdname = ccdnum2name[ccdnum]
+#     all_reason = " & ".join(decode_reason(row.reasons))
+#     all_source = " & ".join(decode_vi_source(row.vi_source))
 #     img = fitsio.read(dr10_imdir / row["image_filename"], ext=row["image_hdu"])
 #     fig, ax = plt.subplots(figsize=(6, 8))
 #     plot_zscale_image(img, ax, 'gray')
@@ -929,7 +925,7 @@ with open(dirpath / "index.html", "w") as fp:
 #     for i, (idx, row) in enumerate(df.iterrows()):
 #         exp = row.expnum
 #         ccdnum = row.ccdnum
-#         ccdname = decam_info.ccdnum2name[ccdnum]
+#         ccdname = ccdnum2name[ccdnum]
 #         fname = f"{exp}_{ccdname}.png"
 #         if i % 5 == 0:
 #             body.append("<tr>")

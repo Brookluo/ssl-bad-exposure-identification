@@ -13,12 +13,10 @@
 # ---
 
 # %%
-import sys
-sys.path.append("../src")
-import decam_info
-from decam_dataset import DECamImageDataset
+from decam_qa import DECamImageDataset
 
 # %%
+import sys
 sys.path.append("../../img-spec-ml/src/")
 from plot_utils import plot_zscale_image
 

@@ -17,21 +17,16 @@ import torch
 
 # %%
 from pathlib import Path
-import sys
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
 # %%
-sys.path.append("../src")
-import decam_info
+from decam_qa import decode_ml_label, reason_li, ccdnum2name, decode_reason, decode_vi_source, read_embeddings
 
 # %%
 from astropy.table import Table
 import fitsio
-
-# %%
-from inference import read_embeds
 
 # %%
 import h5py
@@ -61,7 +56,7 @@ plot_dir = eval_dir / "plots"
 plot_dir.mkdir(exist_ok=True)
 
 # %%
-test_data, test_idx, test_label = read_embeds(test_dir / "eval/embeds_out")
+test_data, test_idx, test_label = read_embeddings(test_dir / "eval/embeds_out")
 test_embeds = np.vstack(test_data) #[np.mean(it, axis=0) for it in test_data])
 
 test_idx = np.array(test_idx, dtype=int)
@@ -70,7 +65,7 @@ test_label = np.array(test_label, dtype=int)
 # %%
 # load train data from last train
 train_dir = Path("/pscratch/sd/b/brookluo/decam-exposure/dino_v2/base_resize_dr10cut/train")
-train_data, train_idx, train_label = read_embeds(train_dir / "eval/embeds_out")
+train_data, train_idx, train_label = read_embeddings(train_dir / "eval/embeds_out")
 train_embeds = np.vstack(train_data) #[np.mean(it, axis=0) for it in train_data])
 
 # %%
@@ -109,6 +104,7 @@ from sklearn.preprocessing import Normalizer, StandardScaler,\
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn import metrics
 import joblib
+from decam_qa.classifier import build_pipeline, train
 
 # %%
 train_embeds.shape
@@ -130,24 +126,7 @@ len(train_label)
 # sh.best_estimator_
 
 # %%
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import RandomizedSearchCV
-
-# %%
-from sklearn.model_selection import train_test_split
-
-# %%
-X_train, X_test, y_train, y_test = train_test_split(
-    train_embeds, train_label, test_size=0.3, random_state=42)
-
-# %%
-pipe = Pipeline([
-('scaler', StandardScaler()),
-('preprocessor', PCA()),
-('selector', VarianceThreshold()),
-('classifier', KNeighborsClassifier())
-])
+pipe = build_pipeline()
 
 parameters = {'scaler': [StandardScaler(), MinMaxScaler(),
 	Normalizer(), MaxAbsScaler(), RobustScaler(), PowerTransformer()],
@@ -158,28 +137,18 @@ parameters = {'scaler': [StandardScaler(), MinMaxScaler(),
 	'classifier__leaf_size': [1, 5, 10, 15, 30, 35]
 }
 
-pipe_opt = HalvingRandomSearchCV(
-    pipe, parameters, cv=3,
-    random_state=0, n_jobs=10,
-    factor=2,
-    # resource='n_neighbors',
-    # max_resources=30,
-).fit(X_train, y_train)
-
-pipe_best = pipe_opt.best_estimator_
-
-print('Training set score: ' + str(pipe_best.score(X_train, y_train)))
-print('Test set score: ' + str(pipe_best.score(X_test, y_test)))
+pipe_best = train(pipe, train_embeds, train_label,
+                  search_params=parameters, n_jobs=10)
 
 # %%
-print(grid.best_estimator_)
+print(pipe_best)
 
 # %%
 import joblib
-joblib.dump(pipe_opt.best_estimator_, '/global/u1/b/brookluo/decam-exposure-quality/postproc/knn_pipe.pkl', compress=1)
+joblib.dump(pipe_best, '/global/u1/b/brookluo/decam-exposure-quality/postproc/knn_pipe.pkl', compress=1)
 
 # %%
-pipe_best = grid.best_estimator_
+# pipe_best = grid.best_estimator_  # preserved
 
 # %%
 scaler = StandardScaler().fit(train_embeds)
@@ -260,15 +229,6 @@ tested.to_csv(eval_dir / "dr10cut_ml_inference_output.csv", index=False)
 tested = pd.read_csv(eval_dir / "dr10cut_ml_inference_output.csv")
 
 # %%
-from typing import Iterable, List
-
-
-# %%
-def decode_ml_label(ml_label: Iterable) -> List:
-    return [decam_info.reason_li[l-1] if l > 0 else "good" for l in ml_label]
-
-
-# %%
 np.unique(decode_ml_label(tested["ml_label"]))
 
 # %%
@@ -283,7 +243,7 @@ plot_idx = np.hstack([tested.query("ml_label == @i & ml_proba > @prob_thres & cc
            ])
 
 # %%
-sys.path.append("../src/")
+# %%
 from plot_utils import plot_zscale_image
 
 def plot_ccd_images(outdir: Path, imdir: Path, df_img, idx):
@@ -292,10 +252,10 @@ def plot_ccd_images(outdir: Path, imdir: Path, df_img, idx):
         # row = df_img.loc[i]
         exp = row.expnum
         ccdnum = row.ccdnum
-        ccdname = decam_info.ccdnum2name[ccdnum]
-        # all_reason = " & ".join(decam_info.decode_reason(row.reasons))
-        # all_source = " & ".join(decam_info.decode_vi_source(row.vi_source))
-        reason = decam_info.reason_li[row["ml_label"]-1]
+        ccdname = ccdnum2name[ccdnum]
+        # all_reason = " & ".join(decode_reason(row.reasons))
+        # all_source = " & ".join(decode_vi_source(row.vi_source))
+        reason = reason_li[row["ml_label"]-1]
         # all_reason_source = f"{all_reason} by {all_source}"
         dir_rea = Path(outdir, reason)
         dir_rea.mkdir(exist_ok=True, parents=True)
@@ -367,7 +327,7 @@ for onedir in dirpath.glob("*"):
 # for i, (idx, row) in enumerate(df_test.iloc[idx[y_cut][pick_fp]].iterrows()):
 #     exp = row.expnum
 #     ccdnum = row.ccdnum
-#     ccdname = decam_info.ccdnum2name[ccdnum]
+#     ccdname = ccdnum2name[ccdnum]
 #     fname = f"{exp}_{ccdname}.png"
 #     if i % 5 == 0:
 #         body.append("<tr>")
@@ -389,7 +349,7 @@ index = '''<!DOCTYPE html>
 </html>
 '''
 
-all_reason = [f'<li><a href="./{r}.html">{r}</a></li>' for r in (["good"] + list(decam_info.reason_li)) if r in os.listdir(dirpath)]
+all_reason = [f'<li><a href="./{r}.html">{r}</a></li>' for r in (["good"] + list(reason_li)) if r in os.listdir(dirpath)]
 with open(dirpath / "index.html", "w") as fp:
     fp.write(index.format(list="\n".join(all_reason)))
 
