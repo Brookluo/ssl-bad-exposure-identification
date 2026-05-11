@@ -1,7 +1,6 @@
 """I/O utilities: HDF5 embedding read/write and FITS image loading."""
 from pathlib import Path
 from typing import List, Tuple
-import h5py
 import numpy as np
 from astropy.io import fits
 
@@ -32,6 +31,7 @@ def read_embeddings(h5_dir: str) -> Tuple[List[np.ndarray], List[str], List[str]
     h5_files = sorted(target_dir.glob("*_worker_embeds.h5"))
     if not h5_files:
         raise FileNotFoundError(f"No *_worker_embeds.h5 files found in {target_dir}")
+    import h5py
     data, idx, label = [], [], []
     for fpath in h5_files:
         with h5py.File(fpath, 'r') as h5f:
@@ -74,6 +74,7 @@ def write_embeddings(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     h5path = output_dir / f"{worker_id}_worker_embeds.h5"
+    import h5py
     with h5py.File(h5path, 'a') as h5f:
         if "images" not in h5f:
             h5f.create_group("images")
