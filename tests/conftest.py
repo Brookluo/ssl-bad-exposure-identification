@@ -19,8 +19,10 @@ def synthetic_image():
 def tmp_fits_image(tmp_path, synthetic_image):
     """Create a temporary FITS file from a synthetic image."""
     fpath = tmp_path / "test_image.fits.fz"
-    hdu = fits.PrimaryHDU(synthetic_image[0])
-    hdul = fits.HDUList([hdu])
+    hdu_primary = fits.PrimaryHDU(synthetic_image[0])
+    hdu1 = fits.ImageHDU(synthetic_image[0])
+    hdu2 = fits.ImageHDU(synthetic_image[0])
+    hdul = fits.HDUList([hdu_primary, hdu1, hdu2])
     hdul.writeto(fpath)
     return fpath
 
