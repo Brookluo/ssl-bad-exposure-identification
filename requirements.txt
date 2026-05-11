@@ -15,3 +15,6 @@ astropy
 
 # for jupyter notebook management
 jupytext
+
+# testing
+pytest
