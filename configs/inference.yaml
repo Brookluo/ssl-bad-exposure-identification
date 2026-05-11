@@ -1,0 +1,14 @@
+pipeline_path: /pscratch/sd/b/brookluo/decam-exposure/postproc/knn_pipe.pkl
+
+embeddings_dir: /pscratch/sd/b/brookluo/decam-exposure/revision/node0/embeds_out
+dataset_csv: /pscratch/sd/b/brookluo/decam-exposure/revision/proc-data/node0_dr10_sample.csv
+
+probability_threshold: 0.7
+top_n_per_class: 200
+
+metadata:
+  dr10_tab: /global/cfs/cdirs/cosmo/work/legacysurvey/dr10/survey-ccds-decam-dr10.fits.gz
+  ccd_cuts_enabled: true
+
+results_dir: /pscratch/sd/b/brookluo/decam-exposure/revision/results
+plot_dir: /pscratch/sd/b/brookluo/decam-exposure/revision/plots
