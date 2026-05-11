@@ -10,13 +10,10 @@ from decam_qa.info import (
 
 class TestCCDMappings:
     def test_ccdname2num_all_keys(self):
-        assert len(ccdname2num) == 62
-        for name in [f"S{i}" for i in range(1, 32)] + [f"N{i}" for i in range(1, 32)]:
-            if name == "S8":
-                continue
-            assert name in ccdname2num, f"Missing {name}"
+        expected_names = set([f"S{i}" for i in range(1, 32)] + [f"N{i}" for i in range(1, 32)])
+        assert set(ccdname2num.keys()) == expected_names, "Missing or extra CCD names"
         vals = list(ccdname2num.values())
-        assert len(vals) == len(set(vals)), "CCD numbers must be unique"
+        assert len(set(vals)) == len(vals), "CCD numbers must be unique"
         assert min(vals) == 1
         assert max(vals) == 62
 
