@@ -26,12 +26,15 @@ class TestCCDMappings:
 
 class TestReasonDicts:
     def test_reason_num_dict_consistency(self):
-        core_indices = set(range(15))
-        for name, idx in reason_num_dict.items():
-            if idx in core_indices:
-                continue
-            assert reason_num_dict.get(reason_li[idx]) == idx, \
-                f"Alias {name} points to {idx} but canonical name mismatches"
+        alias_checks = {
+            "Clouds": "Clouds_transparency",
+            "Ghosting": "Ghost_scatter",
+            "Telescope_tracking": "Telescope_moving",
+            "Readout": "Noise",
+        }
+        for alias, canonical in alias_checks.items():
+            assert reason_num_dict[alias] == reason_num_dict[canonical], \
+                f"Alias {alias} should map to same bit as {canonical}"
 
     def test_decode_reason_zero(self):
         assert decode_reason(0) == []
@@ -63,6 +66,9 @@ class TestReasonDicts:
 class TestViSource:
     def test_decode_vi_source_single(self):
         assert decode_vi_source(1) == ["Rongpu"]
+
+    def test_decode_vi_source_alex_only(self):
+        assert decode_vi_source(2) == ["Alex"]
 
     def test_decode_vi_source_combined(self):
         result = decode_vi_source(3)
