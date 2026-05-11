@@ -3,4 +3,5 @@ __pycache__/
 *.pyc
 *.pyo
 ext-data/
-
+# use py and jupytext track jupyter notebook
+*.ipynb

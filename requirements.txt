@@ -12,3 +12,6 @@ torchvision
 # Astro
 fitsio
 astropy
+
+# for jupyter notebook management
+jupytext
