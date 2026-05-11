@@ -1,10 +1,12 @@
 from torch.utils.data import Dataset
+import torch
 import numpy as np
 from pathlib import Path
 # import fitsio
 import pandas as pd
 import decam_info
 from astropy.table import Table
+from astropy.io import fits
 from read_image import read_image
 from typing import Union
 import logging
@@ -46,7 +48,7 @@ class DECamImageDataset(Dataset):
         # print(data_row)
         # img_data = fitsio.read(self.image_dir / data_row['image_filename'],
         #                        ext=data_row['image_hdu'])
-        with fits.open(self.image_dir / data_row['image_filename'], 'r') as hdul:
+        with fits.open(self.image_dir / data_row['image_filename']) as hdul:
             img_data = hdul[data_row['image_hdu']].data
         # single channel image
         img_data = np.expand_dims(img_data, axis=0)
@@ -82,7 +84,7 @@ class DECamImageDataset(Dataset):
         # arr_sources = np.zeros(len(decam_info.reason_source.keys()), dtype=int)
         # vi_source identifier starts at 1
         # arr_sources[sources-1] = 1
-        return img_data, out_reason
+        return img_data.astype(img_data.dtype.newbyteorder('=')), out_reason
         
     def shuffle(self, seed):
         rng = np.random.default_rng(self.seed + seed)

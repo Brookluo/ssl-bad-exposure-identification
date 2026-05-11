@@ -1,0 +1,14 @@
+# general
+numpy
+matplotlib
+pandas
+h5py
+scipy
+
+# ML-specific
+torch
+torchvision
+
+# Astro
+fitsio
+astropy

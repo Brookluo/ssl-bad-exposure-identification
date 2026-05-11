@@ -107,18 +107,18 @@ reason_num_dict = {
     "Bad_seeing": 3,
     "PSF": 4,
     "Nonoptimal_exp": 5,
-    "Ghost_Scatter": 6,
+    "Ghost_scatter": 6,
     "NObjects": 7,
     "Bad_CCD": 8,
     "Noise": 9,
     "Fringing": 10,
     "Canopus": 11,
     "Wonky": 12,
-    "Telescope_Moving": 13,
+    "Telescope_moving": 13,
     "Out_of_focus": 14,
     "Clouds": 2,
     "Ghosting": 6,
-    "Telescope_Tracking": 13,
+    "Telescope_tracking": 13,
     "Readout": 9,  # original num: 15
 }
 # removed the redaundant options
@@ -130,14 +130,14 @@ reason_li = (
     "Bad_seeing",
     "PSF",
     "Nonoptimal_exp",
-    "Ghost_Scatter",
+    "Ghost_scatter",
     "NObjects",
     "Bad_CCD",
     "Noise",
     "Fringing",
     "Canopus",
     "Wonky",
-    "Telescope_Moving",
+    "Telescope_moving",
     "Out_of_focus",
     # 'Readout'
 )

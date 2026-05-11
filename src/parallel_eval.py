@@ -104,10 +104,11 @@ def gen_embeds(model, exp_dir, imdir, args):
     )
     sampler = torch.utils.data.SequentialSampler(dataset)
     loader = DataLoader(dataset, 
-                        batch_size=args.batch_size, 
+                        batch_size=1,#args.batch_size, 
                         num_workers=args.num_workers,
                        sampler=sampler,
-                       pin_memory=False)
+                       pin_memory=False,
+                       drop_last=False)
     h5fname = f"{args.gpu_idx}_worker_embeds.h5"
     with h5py.File(embeds_dir / h5fname, 'a') as h5f:
         if "images" not in h5f.keys():
