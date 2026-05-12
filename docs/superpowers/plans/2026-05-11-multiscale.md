@@ -48,45 +48,69 @@ These fixes are committed as a separate preliminary commit before the main work 
 - Modify: `src/decam_qa/embeddings.py`
 - Create: `tests/test_embeddings.py` (extend)
 
-- [ ] **Step 1: Write test for convert_patch_embed_to_single_channel**
+- [ ] **Step 1: Add fake_dino_model fixture to tests/conftest.py**
+
+```python
+@pytest.fixture
+def fake_dino_model():
+    """A minimal mock DINOv2 model with a real nn.Conv2d patch_embed.proj.
+
+    Returns a real nn.Sequential as patch_embed so tests can verify
+    weight manipulation. Does NOT mock torch.hub.load — use mock_torch_hub
+    for tests that need to intercept model loading.
+    """
+    import torch
+    import torch.nn as nn
+    class FakePatchEmbed(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.proj = nn.Conv2d(3, 768, kernel_size=14, stride=14, bias=True)
+    class FakeModel(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.patch_embed = FakePatchEmbed()
+            self.embed_dim = 768
+    return FakeModel()
+```
+
+### Step 2: Write test for convert_patch_embed_to_single_channel
 
 Extend `tests/test_embeddings.py` with:
 ```python
 class TestSingleChannel:
-    def test_convert_preserves_numerics(self, mock_torch_hub):
+    def test_convert_preserves_numerics(self, fake_dino_model):
         """Replicated grayscale via channel sum must match single-channel path."""
         import torch
-        from decam_qa.embeddings import create_model, convert_patch_embed_to_single_channel
+        from decam_qa.embeddings import convert_patch_embed_to_single_channel
 
-        model = create_model("base", use_register=True)
+        model = fake_dino_model
         original_proj = model.patch_embed.proj
         convert_patch_embed_to_single_channel(model)
 
-        # Create dummy 1-channel and 3-channel inputs
+        # Create dummy 1-channel input
         x1 = torch.randn(1, 1, 224, 224)
-        x3 = x1.expand(-1, 3, -1, -1)
 
         # Single-channel result
         out1 = model.patch_embed.proj(x1)
 
         # Manually compute what 3-channel would give: sum channels then project
-        # (The original 3-chan conv summed across input channels should match)
         summed_weight = original_proj.weight.sum(dim=1, keepdim=True)
         expected = torch.nn.functional.conv2d(x1, summed_weight, original_proj.bias,
                                               stride=original_proj.stride,
                                               padding=original_proj.padding)
         assert torch.allclose(out1, expected, atol=1e-5)
 
-    def test_convert_accepts_single_channel(self, mock_torch_hub):
+    def test_convert_accepts_single_channel(self, fake_dino_model):
         """After conversion, model accepts (1, 1, H, W) input."""
         import torch
-        from decam_qa.embeddings import create_model, convert_patch_embed_to_single_channel
+        from decam_qa.embeddings import convert_patch_embed_to_single_channel
 
-        model = create_model("base", use_register=True)
+        model = fake_dino_model
         convert_patch_embed_to_single_channel(model)
 
         x = torch.randn(2, 1, 224, 224)
         out = model.patch_embed.proj(x)
+        assert out.shape[1] == model.embed_dim
         assert out.shape[1] == model.embed_dim
 ```
 
@@ -131,7 +155,7 @@ python -m pytest tests/test_embeddings.py::TestSingleChannel -v
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/decam_qa/embeddings.py tests/test_embeddings.py
+git add tests/conftest.py src/decam_qa/embeddings.py tests/test_embeddings.py
 git commit -m "feat: add convert_patch_embed_to_single_channel for 1-channel DINOv2 input"
 ```
 
@@ -580,29 +604,40 @@ def select_top_k_ccds(scores, ccd_rows, k=8,
 
     # Build a priority queue: top-K by score first, then fallbacks.
     # Fallbacks can only displace lower-scoring items within k, never exceed k.
+    # Never evict the highest-scoring CCD.
     selected_indices = set(order[:effective_k].tolist())
 
-    # Add center fallback: if missing, replace the lowest-scoring selected
+    def _lowest_selected():
+        """Return index of lowest-scoring selected item, excluding the top scorer."""
+        scored = [(scores[i], i) for i in selected_indices]
+        scored.sort()
+        # scored[0] is lowest, scored[-1] is highest. Don't evict the highest.
+        if len(scored) <= 1:
+            return None
+        return scored[0][1]
+
+    # Add center fallback: if missing, displace the lowest-scoring (not top)
     if include_center_fallback and len(selected_indices) > 0:
         has_center = any(ccd_rows[i]["ccdnum"] == _CENTER_CCD for i in selected_indices)
         if not has_center:
             for i, row in enumerate(ccd_rows):
                 if row["ccdnum"] == _CENTER_CCD and i not in selected_indices:
-                    # Remove lowest-scoring from the tail of ordered selections
-                    lowest = order[effective_k - 1]
-                    selected_indices.discard(lowest)
-                    selected_indices.add(i)
+                    victim = _lowest_selected()
+                    if victim is not None:
+                        selected_indices.discard(victim)
+                        selected_indices.add(i)
                     break
 
-    # Add edge fallback: same logic — displace lowest-scoring
+    # Add edge fallback: same logic, recompute lowest after center change
     if include_edge_fallback and len(selected_indices) > 0:
         has_edge = any(ccd_rows[i]["ccdnum"] in _EDGE_CCDS for i in selected_indices)
         if not has_edge:
             for i, row in enumerate(ccd_rows):
                 if row["ccdnum"] in _EDGE_CCDS and i not in selected_indices:
-                    lowest = order[effective_k - 1]
-                    selected_indices.discard(lowest)
-                    selected_indices.add(i)
+                    victim = _lowest_selected()
+                    if victim is not None:
+                        selected_indices.discard(victim)
+                        selected_indices.add(i)
                     break
 
     result = []
@@ -1030,6 +1065,8 @@ from decam_qa.classifier import (
     aggregate_exposure_embeddings,
     train_logistic_binary,
     predict_binary,
+    train_multilabel_reason,
+    predict_multilabel,
 )
 
 
@@ -1100,8 +1137,8 @@ class TestMultiReasonClassifier:
         n = 100
         X = rng.normal(0, 1, (n, 200))
         # 3 reason bits: bit 0 (Saturated), bit 1 (Clouds), bit 2 (PSF)
-        # Encode as bitmask: good=0, saturated=1, clouds=2, psf=4
-        y_multilabel = np.array([0, 1, 2, 4, 0, 1, 1|2, 2|4] * (n//8), dtype=int)
+        pattern = [0, 1, 2, 4, 0, 1, 1|2, 2|4]
+        y_multilabel = np.array(pattern * (n // len(pattern)), dtype=int)[:n]
 
         model = train_multilabel_reason(X, y_multilabel, n_reasons=15,
                                          class_balanced=True, random_state=42)
@@ -1164,7 +1201,7 @@ from decam_qa.io import read_exposure_embeddings
 
 class TestReadExposureEmbeddings:
     def test_reads_global_and_locals(self, tmp_path):
-        fpath = tmp_path / "test.h5"
+        fpath = tmp_path / "0_worker_embeds.h5"  # must match glob pattern
         rng = np.random.default_rng(42)
         with h5py.File(fpath, 'w') as f:
             grp = f.create_group("exposures")
@@ -1209,7 +1246,7 @@ Add to `src/decam_qa/io.py`:
 def read_exposure_embeddings(h5_dir_or_path):
     """Read multi-scale exposure embeddings from HDF5 directory or file.
 
-    Accepts either a directory (searches ``*_worker_embeds.h5``, merges across
+    Accepts either a directory (globs ``*.h5``, merges across all
     workers — matching read_embeddings behavior) or a single file path.
 
     Returns dict: {expnum: {"global": array, "locals": [arrays], "metadata": dict}}
@@ -1304,6 +1341,7 @@ python -m decam_qa.cli embed --help
 ```bash
 git add configs/exposure_multiscale.yaml src/decam_qa/config.py src/decam_qa/cli.py
 git commit -m "feat: add exposure_multiscale config, --output-dir CLI arg, multi-scale dispatch"
+```
 
 ---
 
@@ -1366,7 +1404,9 @@ for expnum, data in result.items():
 - [ ] **Step 4: Commit**
 
 ```bash
-git add -A && git commit -m "chore: integration verification — all tests pass, CLI embeds work"
+git add src/decam_qa/ configs/ tests/ nb/ README.md && \
+git diff --cached --stat && \
+git commit -m "chore: integration verification — all tests pass, CLI embeds work"
 ```
 
 ---
