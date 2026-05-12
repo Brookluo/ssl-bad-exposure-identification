@@ -4,8 +4,6 @@ Builds low-resolution single-channel stamps from exposure HDUs by downsampling
 CCDs and placing them in focal-plane layout.
 """
 import numpy as np
-from pathlib import Path
-from decam_qa.info import ccdname2num
 
 
 # Focal-plane layout: x_pix and y_pix are CCD center positions in native
@@ -37,8 +35,6 @@ _Y_PIX = np.array([0, 0, 0, 2249, 2249, 2249, 2249, 4498, 4498, 4498, 4498,
 
 _NATIVE_X = 29590
 _NATIVE_Y = 26787
-_CCD_WIDTH = 4094
-_CCD_HEIGHT = 2046
 
 # Pre-build mapping: ccdnum -> focal-plane row index
 _CCDNUM_TO_IDX = {num: i for i, num in enumerate(_CCD_NUM_LIST)}

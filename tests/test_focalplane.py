@@ -66,7 +66,9 @@ class TestBuildFocalplaneStamp:
             {"expnum": 1, "image_filename": str(multi_hdu_fits),
              "ccdnum": 32, "image_hdu": 1},
         ]
-        hdul = fits.open(multi_hdu_fits)
+        hdul = fits.open(multi_hdu_fits, mode="update")
+        hdul[1].data[100:200, 100:200] = np.nan
+        hdul[1].data[300, 300] = np.inf
         stamp = build_focalplane_stamp(hdul, rows, binsize=120, fill_value=0.0)
         assert np.all(np.isfinite(stamp))
         hdul.close()
@@ -77,11 +79,16 @@ class TestBuildFocalplaneStamp:
              "ccdnum": 32, "image_hdu": 1},
         ]
         hdul = fits.open(multi_hdu_fits)
-        stamp = build_focalplane_stamp(hdul, rows, binsize=120, reducer="mean")
-        assert np.all(np.isfinite(stamp))
+        stamp_mean = build_focalplane_stamp(hdul, rows, binsize=120, reducer="mean")
         hdul.close()
+        hdul = fits.open(multi_hdu_fits)
+        stamp_median = build_focalplane_stamp(hdul, rows, binsize=120, reducer="median")
+        hdul.close()
+        assert np.all(np.isfinite(stamp_mean))
+        mask = stamp_mean[0] != stamp_median[0]
+        assert np.any(mask), "mean and median outputs should differ for normal data"
 
-    def test_placement_orientation_matches_convention(self, multi_hdu_fits):
+    def test_ccds_placed_in_different_regions(self, multi_hdu_fits):
         """CCDs placed at expected pixel positions and orientation matches
         existing (4094, 2046) convention. Different CCDs map to different
         canvas regions."""

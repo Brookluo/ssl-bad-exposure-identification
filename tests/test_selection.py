@@ -79,6 +79,25 @@ class TestSelectTopK:
         ccdnums = [r["ccdnum"] for r in selected]
         assert 27 in ccdnums  # top-scoring is always included
 
+    def test_fallback_evicts_lowest(self):
+        rows = [
+            {"ccdnum": 26, "image_hdu": 1},
+            {"ccdnum": 27, "image_hdu": 2},
+            {"ccdnum": 28, "image_hdu": 3},
+            {"ccdnum": 25, "image_hdu": 4},
+        ]
+        scores = np.array([10.0, 5.0, 1.0, 2.0])
+        selected = select_top_k_ccds(
+            scores, rows, k=2,
+            include_center_fallback=True,
+            include_edge_fallback=True,
+        )
+        ccdnums = [r["ccdnum"] for r in selected]
+        assert len(selected) == 2
+        assert 26 in ccdnums
+        assert 25 in ccdnums
+        assert 27 not in ccdnums
+
     def test_handles_empty_input(self):
         selected = select_top_k_ccds(np.array([]), [], k=8)
         assert selected == []

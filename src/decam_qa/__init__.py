@@ -8,9 +8,13 @@ _LAZY = {
     'io': ['read_embeddings', 'read_fits_image', 'write_embeddings'],
     'dataset': ['DECamImageDataset'],
     'embeddings': ['create_model', 'generate_embeddings'],
-    'classifier': ['build_pipeline', 'train', 'predict'],
+    'classifier': ['build_pipeline', 'train', 'predict',
+                  'aggregate_exposure_embeddings', 'train_logistic_binary',
+                  'predict_binary', 'train_multilabel_reason',
+                  'predict_multilabel'],
     'pipeline': ['ParallelEvaluator'],
     'config': ['load_config', 'get_default_config'],
+    'selection': ['compute_anomaly_scores', 'select_top_k_ccds'],
 }
 
 
