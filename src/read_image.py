@@ -8,7 +8,7 @@ from typing import Union
 logger = logging.getLogger(__name__)
 
 
-def read_image(image_path: Union[Path, str], padding):
+def read_image(image_path: Union[Path, str], padding: bool) -> tuple[np.ndarray, list[str]]:
     """Read an image from the given file path. The file format must be either .fits.gz or .npz.
     Note the .npz file is constructed from a .fits.gz exposure file.
 
@@ -17,7 +17,7 @@ def read_image(image_path: Union[Path, str], padding):
         padding (bool): the padding parameter passed on to the read_img_fits function.
 
     Returns:
-        numpy.ndarray: The image data.
+        tuple[np.ndarray, list[str]]: The half-sized image data for each CCD and a list of CCD names.
 
     Raises:
         ValueError: If the image format is unknown.

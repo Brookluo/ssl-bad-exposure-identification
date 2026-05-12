@@ -92,7 +92,7 @@ def generate_embeddings(dataset, model, device, output_dir,
                 im = im.to(cuda_device)
             embeds = model.forward(im).numpy(force=True)
             for i, onelab in enumerate(label):
-                orig_idx = dataset.df_data.original_df_idx[step * batch_size + i]
+                orig_idx = step * batch_size + i
                 name = f'idx_{orig_idx:d}_label_{onelab.item():d}'
                 with h5py.File(embeds_dir / h5fname, 'r+') as h5f:
-                    h5f['images'].create_dataset(name, data=embeds, dtype='float')
+                    h5f['images'].create_dataset(name, data=embeds[i], dtype='float')

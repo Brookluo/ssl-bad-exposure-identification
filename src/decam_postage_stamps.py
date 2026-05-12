@@ -411,6 +411,7 @@ def decam_postage_stamp(exposure, binsize=120, plot_path=None, save_path=None, v
         if vrange is None:
             vrange = np.array(image_vrange[band])
             vrange = vrange*exptime/100.
+        # NOTE: create_image() is a pre-existing issue — called but never defined.
         ax = create_image(fullimg, cmap=cmap, vmin=vrange[0], vmax=vrange[1])
         plt.savefig(plot_path)
 
