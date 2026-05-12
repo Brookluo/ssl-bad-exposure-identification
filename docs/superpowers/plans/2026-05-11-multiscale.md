@@ -309,6 +309,10 @@ def build_focalplane_stamp(hdul, exposure_rows, binsize=120,
     stamp_w = _NATIVE_X // binsize + 1
     stamp = np.full((stamp_h, stamp_w), fill_value, dtype=np.float32)
 
+    # Normalize input: DataFrame -> list of dicts
+    if hasattr(exposure_rows, "columns"):  # pd.DataFrame
+        exposure_rows = exposure_rows.to_dict("records")
+
     for row in exposure_rows:
         ccdnum = row["ccdnum"]
         hdu_idx = row["image_hdu"]
@@ -463,7 +467,8 @@ class TestSelectTopK:
             include_center_fallback=True,
             include_edge_fallback=True,
         )
-        assert len(selected) <= 5
+        # Never exceeds k. Only 3 CCDs available total.
+        assert len(selected) == min(5, len(sample_rows))
         ccdnums = [r["ccdnum"] for r in selected]
         assert 27 in ccdnums  # top-scoring is always included
 
@@ -532,10 +537,13 @@ def compute_anomaly_scores(ccd_images, ccd_rows):
         return (values - med) / mad
 
     scores = np.zeros(n)
-    scores += np.clip(np.abs(robust_z(backgrounds)), -5, 5)
-    scores += np.clip(robust_z(scatters), -5, 5)
-    scores += np.clip(robust_z(extreme_fracs), -5, 5)
-    scores += np.clip(robust_z(nonfinite_fracs), -5, 5)
+    # Use abs(z-score) for all components so anomalies always add and never cancel.
+    # scatter, extreme_frac, nonfinite_frac are always "higher is worse".
+    # For background, deviation from the exposure median in either direction is anomalous.
+    scores += np.clip(np.abs(robust_z(backgrounds)), 0, 5)
+    scores += np.clip(np.abs(robust_z(scatters)), 0, 5)
+    scores += np.clip(np.abs(robust_z(extreme_fracs)), 0, 5)
+    scores += np.clip(np.abs(robust_z(nonfinite_fracs)), 0, 5)
 
     return scores
 
@@ -569,20 +577,33 @@ def select_top_k_ccds(scores, ccd_rows, k=8,
     # Sort by descending score
     order = np.argsort(scores)[::-1]
     effective_k = min(k, len(order))
+
+    # Build a priority queue: top-K by score first, then fallbacks.
+    # Fallbacks can only displace lower-scoring items within k, never exceed k.
     selected_indices = set(order[:effective_k].tolist())
 
-    # Add fallbacks
-    if include_center_fallback:
-        for i, row in enumerate(ccd_rows):
-            if row["ccdnum"] == _CENTER_CCD and i not in selected_indices:
-                selected_indices.add(i)
-                break
+    # Add center fallback: if missing, replace the lowest-scoring selected
+    if include_center_fallback and len(selected_indices) > 0:
+        has_center = any(ccd_rows[i]["ccdnum"] == _CENTER_CCD for i in selected_indices)
+        if not has_center:
+            for i, row in enumerate(ccd_rows):
+                if row["ccdnum"] == _CENTER_CCD and i not in selected_indices:
+                    # Remove lowest-scoring from the tail of ordered selections
+                    lowest = order[effective_k - 1]
+                    selected_indices.discard(lowest)
+                    selected_indices.add(i)
+                    break
 
-    if include_edge_fallback:
-        for i, row in enumerate(ccd_rows):
-            if row["ccdnum"] in _EDGE_CCDS and i not in selected_indices:
-                selected_indices.add(i)
-                break
+    # Add edge fallback: same logic — displace lowest-scoring
+    if include_edge_fallback and len(selected_indices) > 0:
+        has_edge = any(ccd_rows[i]["ccdnum"] in _EDGE_CCDS for i in selected_indices)
+        if not has_edge:
+            for i, row in enumerate(ccd_rows):
+                if row["ccdnum"] in _EDGE_CCDS and i not in selected_indices:
+                    lowest = order[effective_k - 1]
+                    selected_indices.discard(lowest)
+                    selected_indices.add(i)
+                    break
 
     result = []
     for i in order:
@@ -879,6 +900,10 @@ class TestMultiscaleEmbeddings:
             eg = g.create_group("exp_1")
             eg.create_dataset("global", data=np.zeros(768))
             eg.create_dataset("local_000", data=np.zeros(768))
+            eg.create_dataset("local_001", data=np.zeros(768))
+            import json
+            eg.create_dataset("metadata", data=json.dumps({
+                "num_selected_views": 2, "filter": 1}))
 
         model = MagicMock()
         model.forward.return_value = MagicMock()
@@ -887,15 +912,57 @@ class TestMultiscaleEmbeddings:
         dataset = MagicMock()
         dataset.__len__.return_value = 2
 
-        # If resume works, exp_1 should be skipped
-        # The mock should only be called for exp_2
+        # exp_1 is complete (global + 2 locals + metadata), so skip it.
+        # exp_2 should be generated.
         with patch("torch.utils.data.DataLoader"):
             generate_exposure_multiscale_embeddings(
                 dataset, model, "cpu", str(tmp_path),
                 batch_size=1, num_workers=0, top_k=8, resume=True)
-        # Should not crash, and exp_1 stays unchanged
         with h5py.File(embeds_dir / "0_worker_embeds.h5", 'r') as f:
             assert "exp_1" in f["exposures"]
+
+    def test_resume_regenerates_partial_group(self, tmp_path):
+        """Partial group (global but missing locals) gets regenerated."""
+        import json
+        embeds_dir = tmp_path / "embeds_out"
+        embeds_dir.mkdir()
+        with h5py.File(embeds_dir / "0_worker_embeds.h5", 'w') as f:
+            g = f.create_group("exposures")
+            eg = g.create_group("exp_1")
+            eg.create_dataset("global", data=np.zeros(768))
+            # Only 1 local, but metadata says 2 selected
+            eg.create_dataset("local_000", data=np.zeros(768))
+            eg.create_dataset("metadata", data=json.dumps({
+                "num_selected_views": 2, "filter": 1}))
+
+        model = MagicMock()
+        model.forward.return_value = MagicMock()
+        model.forward.return_value.numpy.return_value = np.zeros((1, 768), dtype=np.float32)
+
+        dataset = MagicMock()
+        dataset.__len__.return_value = 1
+        mock_item = {
+            "expnum": 1, "image_filename": "exp.fits.fz", "filter": 1,
+            "reason_bitmask": 0,
+            "global_stamp": np.zeros((1, 224, 224), dtype=np.float32),
+            "selected_ccds": [
+                {"ccdnum": 25, "image_hdu": 1, "selection_score": 3.5},
+                {"ccdnum": 26, "image_hdu": 2, "selection_score": 2.1},
+            ],
+            "selected_images": [
+                np.zeros((2046, 4094)), np.zeros((2046, 4094))],
+            "num_readable_ccds": 60,
+        }
+        dataset.__getitem__.return_value = mock_item
+
+        # Partial group should be deleted and regenerated
+        with patch("torch.utils.data.DataLoader"):
+            generate_exposure_multiscale_embeddings(
+                dataset, model, "cpu", str(tmp_path),
+                batch_size=1, num_workers=0, top_k=8, resume=True)
+        with h5py.File(embeds_dir / "0_worker_embeds.h5", 'r') as f:
+            eg = f["exposures"]["exp_1"]
+            assert "local_001" in eg  # now complete
 ```
 
 - [ ] **Step 2: Implement generate_exposure_multiscale_embeddings**
@@ -924,7 +991,9 @@ def generate_exposure_multiscale_embeddings(
     crop_size : tuple or None
         If None, resizes local crops to (2352, 1176).
     resume : bool
-        Skip exposure groups that already have global embedding.
+        Skip exposure groups that are already complete (global + expected number
+        of locals + metadata). Partially-written groups (e.g., global present
+        but missing locals after an interrupted run) are deleted and regenerated.
     overwrite : bool
         If True and resume=False, overwrite existing.
     """
@@ -1023,6 +1092,33 @@ class TestBinaryClassifier:
         p1 = predict_binary(m1, X)
         p2 = predict_binary(m2, X)
         np.testing.assert_array_equal(p1, p2)
+
+
+class TestMultiReasonClassifier:
+    def test_train_on_synthetic_multilabel(self):
+        rng = np.random.default_rng(42)
+        n = 100
+        X = rng.normal(0, 1, (n, 200))
+        # 3 reason bits: bit 0 (Saturated), bit 1 (Clouds), bit 2 (PSF)
+        # Encode as bitmask: good=0, saturated=1, clouds=2, psf=4
+        y_multilabel = np.array([0, 1, 2, 4, 0, 1, 1|2, 2|4] * (n//8), dtype=int)
+
+        model = train_multilabel_reason(X, y_multilabel, n_reasons=15,
+                                         class_balanced=True, random_state=42)
+        probs = predict_multilabel(model, X)
+        assert probs.shape == (n, 15)
+        assert np.all((probs >= 0) & (probs <= 1))
+
+    def test_multilabel_deterministic(self):
+        rng = np.random.default_rng(42)
+        X = rng.normal(0, 1, (50, 200))
+        y = np.array([0, 1, 2, 0, 1] * 10, dtype=int)
+
+        m1 = train_multilabel_reason(X, y, n_reasons=15, random_state=42)
+        m2 = train_multilabel_reason(X, y, n_reasons=15, random_state=42)
+        p1 = predict_multilabel(m1, X)
+        p2 = predict_multilabel(m2, X)
+        np.testing.assert_array_almost_equal(p1, p2)
 ```
 
 - [ ] **Step 2: Implement aggregation and classifiers**
@@ -1031,19 +1127,21 @@ Add to `src/decam_qa/classifier.py`:
 - `aggregate_exposure_embeddings(global_emb, local_embs, scores, k=8)` — returns fixed-length feature vector
 - `train_logistic_binary(X, y, class_balanced=True, random_state=42)` — returns fitted `LogisticRegression`
 - `predict_binary(model, X)` — returns probability of "bad" class
+- `train_multilabel_reason(X, y_bitmask, n_reasons=15, class_balanced=True, random_state=42)` — fits one `OneVsRestClassifier(LogisticRegression)` per reason bit. Converts bitmask labels `y_bitmask` into a multi-label binary matrix of shape `(n_samples, n_reasons)`.
+- `predict_multilabel(model, X)` — returns per-reason probabilities, shape `(n_samples, n_reasons)`
 
 - [ ] **Step 3: Run tests**
 
 ```bash
 python -m pytest tests/test_multiscale_classifier.py -v
 ```
-Expected: 5 tests pass.
+Expected: 7 tests pass.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add src/decam_qa/classifier.py tests/test_multiscale_classifier.py
-git commit -m "feat: add multi-scale aggregation and logistic regression classifier"
+git commit -m "feat: add multi-scale aggregation, binary + multilabel logistic regression"
 ```
 
 ---
@@ -1078,20 +1176,41 @@ class TestReadExposureEmbeddings:
                 import json
                 eg.create_dataset("metadata", data=json.dumps({"filter": 1}))
 
-        result = read_exposure_embeddings(str(fpath))
+        result = read_exposure_embeddings(str(tmp_path))  # directory, merges all workers
         assert len(result) == 2
         for expnum, data in result.items():
             assert "global" in data
             assert len(data["locals"]) > 0
             assert "metadata" in data
+
+    def test_merges_across_workers(self, tmp_path):
+        """Two worker files with different exposures should be merged."""
+        rng = np.random.default_rng(42)
+        for w in range(2):
+            fpath = tmp_path / f"{w}_worker_embeds.h5"
+            with h5py.File(fpath, 'w') as f:
+                grp = f.create_group("exposures")
+                eid = w + 1  # worker 0 has exp_1, worker 1 has exp_2
+                eg = grp.create_group(f"exp_{eid}")
+                eg.create_dataset("global", data=rng.normal(0, 1, 768).astype(np.float32))
+                eg.create_dataset("local_000", data=rng.normal(0, 1, 768).astype(np.float32))
+                import json
+                eg.create_dataset("metadata", data=json.dumps({"filter": 1}))
+
+        result = read_exposure_embeddings(str(tmp_path))
+        assert len(result) == 2
+        assert 1 in result and 2 in result
 ```
 
 - [ ] **Step 2: Implement read_exposure_embeddings**
 
 Add to `src/decam_qa/io.py`:
 ```python
-def read_exposure_embeddings(h5_path):
-    """Read multi-scale exposure embeddings from HDF5.
+def read_exposure_embeddings(h5_dir_or_path):
+    """Read multi-scale exposure embeddings from HDF5 directory or file.
+
+    Accepts either a directory (searches ``*_worker_embeds.h5``, merges across
+    workers — matching read_embeddings behavior) or a single file path.
 
     Returns dict: {expnum: {"global": array, "locals": [arrays], "metadata": dict}}
     """
@@ -1121,21 +1240,70 @@ In `config.py`, add `_REQUIRED_KEYS["exposure_multiscale"]` and defaults.
 
 Per the spec design doc (Section 4.8).
 
-- [ ] **Step 3: Add CLI subcommand or extend embed**
+- [ ] **Step 3: Extend the CLI `embed` subcommand**
 
-```bash
-python -m decam_qa.cli embed \
-  --config configs/exposure_multiscale.yaml \
-  --dset data/samples/test_supervised_ooi_dataset.csv \
-  --dr dr10
+Add `--output-dir` to the embed subcommand parser in `cli.py`:
+```python
+embed_parser.add_argument("--output-dir", default=None,
+                          help="Override scratch_dir from config")
 ```
 
-- [ ] **Step 4: Commit**
+Update `main()` in `cli.py` so that when the config has `representation: exposure_multiscale`,
+the `embed` subcommand dispatches to the multi-scale pipeline instead of the CCD-only one:
+```python
+elif args.command == "embed":
+    from decam_qa.config import load_config
+    config = load_config(args.config, "embed")
+
+    # Check representation to decide which pipeline to use
+    representation = config.get("representation", "ccd")
+
+    if representation == "exposure_multiscale":
+        from decam_qa.dataset import DECamExposureDataset
+        from decam_qa.embeddings import (
+            create_model, generate_exposure_multiscale_embeddings,
+            convert_patch_embed_to_single_channel,
+        )
+        scratch = args.output_dir or config.get("scratch_dir", "./output")
+        image_roots = config.get("image_roots", {})
+        imdir = image_roots.get(args.dr, ".")
+
+        ds = DECamExposureDataset(
+            args.dset, imdir,
+            binsize=config.get("focalplane_stamp", {}).get("binsize", 120),
+            top_k=config.get("local_views", {}).get("top_k", 8),
+        )
+        model = create_model(config["model"]["size"], config["model"]["use_register"])
+        if config["model"].get("single_channel", True):
+            convert_patch_embed_to_single_channel(model)
+
+        generate_exposure_multiscale_embeddings(
+            ds, model, device="cuda", output_dir=scratch,
+            batch_size=config["data"]["batch_size"],
+            num_workers=config["data"].get("num_workers", 4),
+            top_k=config.get("local_views", {}).get("top_k", 8),
+            crop_size=config.get("local_views", {}).get("crop_size"),
+            resume=args.cont,
+        )
+    else:
+        # original CCD-only path
+        from decam_qa.pipeline import ParallelEvaluator
+        evaluator = ParallelEvaluator(config, args.dset, args.dr, resume=args.cont)
+        evaluator.run()
+    print("Embeddings generated successfully.")
+```
+
+- [ ] **Step 4: Verify CLI help includes --output-dir**
+
+```bash
+python -m decam_qa.cli embed --help
+```
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add configs/exposure_multiscale.yaml src/decam_qa/config.py src/decam_qa/cli.py
-git commit -m "feat: add exposure_multiscale config stage and CLI support"
-```
+git commit -m "feat: add exposure_multiscale config, --output-dir CLI arg, multi-scale dispatch"
 
 ---
 
@@ -1188,7 +1356,8 @@ python -m decam_qa.cli embed \
 
 ```python
 from decam_qa.io import read_exposure_embeddings
-result = read_exposure_embeddings("output/embeds_out/0_worker_embeds.h5")
+# Reader accepts a directory (merges across all worker files):
+result = read_exposure_embeddings("/pscratch/sd/b/brookluo/decam-exposure/multiscale/embeds_out")
 print(f"Read {len(result)} exposures")
 for expnum, data in result.items():
     print(f"  exp {expnum}: global {data['global'].shape}, {len(data['locals'])} locals")
@@ -1206,15 +1375,16 @@ git add -A && git commit -m "chore: integration verification — all tests pass,
 
 | Task | Module | Tests | Depends on |
 |------|--------|-------|------------|
+| Pre-fixes | Fix read_image + embeddings bugs | — | — |
 | 1 | Single-channel DINO | 2 tests | embeddings.py |
 | 2 | Focal-plane stamp | 5 tests | focalplane.py (new) |
-| 3 | Anomaly scoring + top-K | 9 tests | selection.py (new) |
-| 4 | Exposure dataset | 8 tests | Task 2, 3 |
-| 5 | Multi-scale embeddings | 2 tests | Task 1, 4 |
-| 6 | Aggregation + classifier | 5 tests | — |
-| 7 | HDF5 reader | 1 test | Task 5 |
-| 8 | Config + CLI | — | Task 5, 6, 7 |
+| 3 | Anomaly scoring + top-K (no cancellation, k-bounded) | 9 tests | selection.py (new) |
+| 4 | Exposure dataset (DataFrame-safe) | 8 tests | Task 2, 3 |
+| 5 | Multi-scale embeddings (complete-group resume) | 3 tests | Task 1, 4 |
+| 6 | Aggregation + binary + multilabel classifiers | 7 tests | — |
+| 7 | HDF5 reader (directory input, multi-worker merge) | 2 tests | Task 5 |
+| 8 | Config + CLI (--output-dir, representation dispatch) | — | Task 5, 6, 7 |
 | 9 | Evaluation + notebook | — | Task 6, 7 |
 | 10 | Integration verification | — | All above |
 
-**Total: ~32 new tests + existing 80 = ~112 tests**
+**Total: ~36 new tests + existing 80 = ~116 tests**
