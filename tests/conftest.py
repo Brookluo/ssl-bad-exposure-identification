@@ -5,6 +5,8 @@ import tempfile
 from pathlib import Path
 import pytest
 import h5py
+import torch
+import torch.nn as nn
 from astropy.io import fits
 
 
@@ -103,3 +105,25 @@ def mock_model(mocker):
     model.eval.return_value = model
     mock.return_value = model
     return model
+
+
+@pytest.fixture
+def fake_dino_model():
+    """A minimal mock DINOv2 model with a real nn.Conv2d patch_embed.proj.
+
+    Returns a real nn.Sequential as patch_embed so tests can verify
+    weight manipulation. Does NOT mock torch.hub.load — use mock_torch_hub
+    for tests that need to intercept model loading.
+    """
+    class FakePatchEmbed(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.proj = nn.Conv2d(3, 768, kernel_size=14, stride=14, bias=True)
+
+    class FakeModel(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.patch_embed = FakePatchEmbed()
+            self.embed_dim = 768
+
+    return FakeModel()

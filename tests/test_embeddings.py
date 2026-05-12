@@ -88,3 +88,36 @@ class TestGenerateEmbeddings:
         assert len(h5_files) == 1
         with h5py.File(h5_files[0], "r") as h5f:
             assert len(h5f["images"]) == 4
+
+
+class TestSingleChannel:
+    def test_convert_preserves_numerics(self, fake_dino_model):
+        """Replicated grayscale via channel sum must match single-channel path."""
+        import torch
+        from decam_qa.embeddings import convert_patch_embed_to_single_channel
+
+        model = fake_dino_model
+        original_proj = model.patch_embed.proj
+        convert_patch_embed_to_single_channel(model)
+
+        x1 = torch.randn(1, 1, 224, 224)
+
+        out1 = model.patch_embed.proj(x1)
+
+        summed_weight = original_proj.weight.sum(dim=1, keepdim=True)
+        expected = torch.nn.functional.conv2d(x1, summed_weight, original_proj.bias,
+                                              stride=original_proj.stride,
+                                              padding=original_proj.padding)
+        assert torch.allclose(out1, expected, atol=1e-5)
+
+    def test_convert_accepts_single_channel(self, fake_dino_model):
+        """After conversion, model accepts (1, 1, H, W) input."""
+        import torch
+        from decam_qa.embeddings import convert_patch_embed_to_single_channel
+
+        model = fake_dino_model
+        convert_patch_embed_to_single_channel(model)
+
+        x = torch.randn(2, 1, 224, 224)
+        out = model.patch_embed.proj(x)
+        assert out.shape[1] == model.embed_dim

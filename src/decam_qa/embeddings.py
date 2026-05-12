@@ -96,3 +96,32 @@ def generate_embeddings(dataset, model, device, output_dir,
                 name = f'idx_{orig_idx:d}_label_{onelab.item():d}'
                 with h5py.File(embeds_dir / h5fname, 'r+') as h5f:
                     h5f['images'].create_dataset(name, data=embeds[i], dtype='float')
+
+
+def convert_patch_embed_to_single_channel(model):
+    """Replace 3-channel DINOv2 patch projection with 1-channel equivalent.
+
+    Sums the existing 3-channel conv weights so a single-channel grayscale
+    input produces identical patch embeddings. Copy bias unchanged.
+
+    This is exact only when no per-channel RGB normalization is applied.
+
+    Parameters
+    ----------
+    model : torch.nn.Module
+        DINOv2 model with a ``patch_embed.proj`` Conv2d attribute.
+    """
+    old_conv = model.patch_embed.proj
+    new_conv = torch.nn.Conv2d(
+        in_channels=1,
+        out_channels=old_conv.out_channels,
+        kernel_size=old_conv.kernel_size,
+        stride=old_conv.stride,
+        padding=old_conv.padding,
+        bias=old_conv.bias is not None,
+    )
+    with torch.no_grad():
+        new_conv.weight.copy_(old_conv.weight.sum(dim=1, keepdim=True))
+        if old_conv.bias is not None:
+            new_conv.bias.copy_(old_conv.bias)
+    model.patch_embed.proj = new_conv
