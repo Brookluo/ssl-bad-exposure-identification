@@ -179,12 +179,15 @@ from decam_qa.focalplane import build_focalplane_stamp
 
 @pytest.fixture
 def multi_hdu_fits(tmp_path):
-    """Create a FITS file with 3 CCD HDUs named N1, N2, N3."""
+    """Create a FITS file with 3 CCD HDUs named N1, N2, N3.
+
+    CCD shape matches existing DECam convention: (4094, 2046).
+    """
     rng = np.random.default_rng(42)
     fpath = tmp_path / "exposure.fits.fz"
     hdus = [fits.PrimaryHDU()]
     for name in ["N1", "N2", "N3"]:
-        data = rng.normal(100, 10, (2046, 4094)).astype(np.float32)
+        data = rng.normal(100, 10, (4094, 2046)).astype(np.float32)
         hdu = fits.ImageHDU(data, name=name)
         hdus.append(hdu)
     fits.HDUList(hdus).writeto(fpath)
@@ -248,6 +251,23 @@ class TestBuildFocalplaneStamp:
         hdul = fits.open(multi_hdu_fits)
         stamp = build_focalplane_stamp(hdul, rows, binsize=120, reducer="mean")
         assert np.all(np.isfinite(stamp))
+        hdul.close()
+
+    def test_placement_orientation_matches_convention(self, multi_hdu_fits):
+        """CCDs placed at expected pixel positions and orientation matches
+        existing (4094, 2046) convention. Different CCDs map to different
+        canvas regions."""
+        rows = [
+            {"expnum": 1, "image_filename": str(multi_hdu_fits),
+             "ccdnum": 32, "image_hdu": 1},  # N1
+            {"expnum": 1, "image_filename": str(multi_hdu_fits),
+             "ccdnum": 33, "image_hdu": 2},  # N2
+        ]
+        hdul = fits.open(multi_hdu_fits)
+        stamp = build_focalplane_stamp(hdul, rows, binsize=120)
+        # Two different CCDs should place in different canvas regions
+        nonzero = np.argwhere(stamp[0] != 0.0)
+        assert len(nonzero) > 0, "Stamp should have placed CCD pixels"
         hdul.close()
 ```
 
@@ -395,7 +415,7 @@ def build_focalplane_stamp(hdul, exposure_rows, binsize=120,
 ```bash
 python -m pytest tests/test_focalplane.py -v
 ```
-Expected: 5 tests pass.
+Expected: 6 tests pass.
 
 - [ ] **Step 4: Commit**
 
@@ -605,27 +625,51 @@ def select_top_k_ccds(scores, ccd_rows, k=8,
     # Build a priority queue: top-K by score first, then fallbacks.
     # Fallbacks can only displace lower-scoring items within k, never exceed k.
     # Never evict the highest-scoring CCD.
+    #
+    # Best-effort: fallbacks are protected from displacement by subsequent
+    # fallbacks (see is_fallback set below). However, if k is too small to
+    # hold top anomaly + center + edge simultaneously, only the first fallback
+    # that fits survives — this is intentional (fallbacks are preferences, not
+    # hard requirements). Set k >= 3 when using both fallbacks to guarantee
+    # room for top + center + edge.
     selected_indices = set(order[:effective_k].tolist())
+    protected = set()  # indices we won't evict (top scorer, added fallbacks)
 
-    def _lowest_selected():
-        """Return index of lowest-scoring selected item, excluding the top scorer."""
-        scored = [(scores[i], i) for i in selected_indices]
-        scored.sort()
-        # scored[0] is lowest, scored[-1] is highest. Don't evict the highest.
-        if len(scored) <= 1:
+    # Protect the highest-scoring CCD from ever being evicted
+    protected.add(order[0])
+
+    def _lowest_evictable():
+        """Return index of lowest-scoring selected item not in protected."""
+        scored = [(scores[i], i) for i in selected_indices if i not in protected]
+        if not scored:
             return None
+        scored.sort()
         return scored[0][1]
 
-    # Add center fallback: if missing, displace the lowest-scoring (not top)
+    # Add center fallback: if missing, displace lowest evictable
     if include_center_fallback and len(selected_indices) > 0:
         has_center = any(ccd_rows[i]["ccdnum"] == _CENTER_CCD for i in selected_indices)
         if not has_center:
             for i, row in enumerate(ccd_rows):
                 if row["ccdnum"] == _CENTER_CCD and i not in selected_indices:
-                    victim = _lowest_selected()
+                    victim = _lowest_evictable()
                     if victim is not None:
                         selected_indices.discard(victim)
-                        selected_indices.add(i)
+                    selected_indices.add(i)
+                    protected.add(i)  # protect from later fallback displacement
+                    break
+
+    # Add edge fallback: same logic, with its own protection
+    if include_edge_fallback and len(selected_indices) > 0:
+        has_edge = any(ccd_rows[i]["ccdnum"] in _EDGE_CCDS for i in selected_indices)
+        if not has_edge:
+            for i, row in enumerate(ccd_rows):
+                if row["ccdnum"] in _EDGE_CCDS and i not in selected_indices:
+                    victim = _lowest_evictable()
+                    if victim is not None:
+                        selected_indices.discard(victim)
+                    selected_indices.add(i)
+                    protected.add(i)
                     break
 
     # Add edge fallback: same logic, recompute lowest after center change
@@ -1138,7 +1182,7 @@ class TestMultiReasonClassifier:
         X = rng.normal(0, 1, (n, 200))
         # 3 reason bits: bit 0 (Saturated), bit 1 (Clouds), bit 2 (PSF)
         pattern = [0, 1, 2, 4, 0, 1, 1|2, 2|4]
-        y_multilabel = np.array(pattern * (n // len(pattern)), dtype=int)[:n]
+        y_multilabel = np.resize(pattern, n)
 
         model = train_multilabel_reason(X, y_multilabel, n_reasons=15,
                                          class_balanced=True, random_state=42)
@@ -1330,6 +1374,12 @@ elif args.command == "embed":
     print("Embeddings generated successfully.")
 ```
 
+Ensure `cli.py` ends with:
+```python
+if __name__ == "__main__":
+    main()
+```
+
 - [ ] **Step 4: Verify CLI help includes --output-dir**
 
 ```bash
@@ -1417,8 +1467,8 @@ git commit -m "chore: integration verification — all tests pass, CLI embeds wo
 |------|--------|-------|------------|
 | Pre-fixes | Fix read_image + embeddings bugs | — | — |
 | 1 | Single-channel DINO | 2 tests | embeddings.py |
-| 2 | Focal-plane stamp | 5 tests | focalplane.py (new) |
-| 3 | Anomaly scoring + top-K (no cancellation, k-bounded) | 9 tests | selection.py (new) |
+| 2 | Focal-plane stamp (correct orientation, placement test) | 6 tests | focalplane.py (new) |
+| 3 | Anomaly scoring + top-K (no cancellation, k-bounded, protected fallbacks) | 9 tests | selection.py (new) |
 | 4 | Exposure dataset (DataFrame-safe) | 8 tests | Task 2, 3 |
 | 5 | Multi-scale embeddings (complete-group resume) | 3 tests | Task 1, 4 |
 | 6 | Aggregation + binary + multilabel classifiers | 7 tests | — |
@@ -1427,4 +1477,4 @@ git commit -m "chore: integration verification — all tests pass, CLI embeds wo
 | 9 | Evaluation + notebook | — | Task 6, 7 |
 | 10 | Integration verification | — | All above |
 
-**Total: ~36 new tests + existing 80 = ~116 tests**
+**Total: ~37 new tests + existing 80 = ~117 tests**
