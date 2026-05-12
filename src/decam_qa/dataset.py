@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 from astropy.io import fits
 from decam_qa.info import reason_num_dict, decode_reason
+from decam_qa.focalplane import build_focalplane_stamp
+from decam_qa.selection import compute_anomaly_scores, select_top_k_ccds
 
 
 class DECamImageDataset(Dataset):
@@ -94,3 +96,106 @@ class DECamImageDataset(Dataset):
         new_acc_idx = new_mat.ravel()
         new_acc_idx = new_acc_idx[~np.isnan(new_acc_idx)].astype(int)
         self.access_idx = new_acc_idx
+
+
+class DECamExposureDataset:
+    """Dataset yielding exposure-grouped multi-scale DECam data.
+
+    Groups CCD rows by ``expnum``. Each item is a dict with the global focal-plane
+    stamp, top-K anomalous CCD images, and metadata.
+
+    Parameters
+    ----------
+    dataset_path : pathlib.Path or str
+        CSV with columns ``image_filename``, ``expnum``, ``ccdnum``,
+        ``image_hdu``, ``filter``, ``reasons``, ``vi_source``.
+    image_dir : pathlib.Path or str
+        Directory containing the FITS images.
+    binsize : int
+        Downsampling factor for the focal-plane stamp (default 120).
+    top_k : int
+        Max number of anomalous CCDs to select (default 8).
+    include_center_fallback : bool
+        Always include one central CCD in selection (default True).
+    include_edge_fallback : bool
+        Always include one edge CCD in selection (default True).
+    transform : callable, optional
+        Transform applied to the returned dict before returning.
+    """
+
+    def __init__(self, dataset_path, image_dir, binsize=120,
+                 top_k=8, include_center_fallback=True,
+                 include_edge_fallback=True, transform=None):
+        self.df_data = pd.read_csv(dataset_path)
+        self.image_dir = Path(image_dir)
+        self.binsize = binsize
+        self.top_k = top_k
+        self.include_center_fallback = include_center_fallback
+        self.include_edge_fallback = include_edge_fallback
+        self.transform = transform
+        self.exposure_groups = self.df_data.groupby("expnum")
+        self.expnums = list(self.exposure_groups.groups.keys())
+
+    def __len__(self):
+        return len(self.expnums)
+
+    def __getitem__(self, idx):
+        expnum = self.expnums[idx]
+        rows = self.exposure_groups.get_group(expnum)
+
+        image_filename = rows["image_filename"].iloc[0]
+        filt = rows["filter"].iloc[0]
+        reason_bitmask = int(np.bitwise_or.reduce(rows["reasons"].values))
+
+        with fits.open(self.image_dir / Path(image_filename).name) as hdul:
+            ccd_images = []
+            ccd_rows = []
+            num_readable_ccds = 0
+            for _, row in rows.iterrows():
+                try:
+                    img = np.asarray(hdul[row["image_hdu"]].data, dtype=np.float32)
+                    img = np.expand_dims(img, axis=0)
+                    ccd_images.append(img)
+                    ccd_rows.append(row.to_dict())
+                    num_readable_ccds += 1
+                except (IndexError, KeyError, OSError):
+                    continue
+
+            if num_readable_ccds == 0:
+                raise RuntimeError(f"No readable CCDs for exposure {expnum}")
+
+            global_stamp = build_focalplane_stamp(
+                hdul, rows, binsize=self.binsize,
+            )
+
+            scores = compute_anomaly_scores(ccd_images, ccd_rows)
+            selected = select_top_k_ccds(
+                scores, ccd_rows, k=self.top_k,
+                include_center_fallback=self.include_center_fallback,
+                include_edge_fallback=self.include_edge_fallback,
+            )
+
+            ccd_images_by_hdu = {
+                row["image_hdu"]: img
+                for row, img in zip(ccd_rows, ccd_images)
+            }
+            selected_images = [
+                ccd_images_by_hdu[sel_entry["image_hdu"]]
+                for sel_entry in selected
+            ]
+
+        result = {
+            "expnum": expnum,
+            "image_filename": image_filename,
+            "filter": filt,
+            "reason_bitmask": reason_bitmask,
+            "global_stamp": global_stamp,
+            "selected_ccds": selected,
+            "selected_images": selected_images,
+            "num_readable_ccds": num_readable_ccds,
+        }
+
+        if self.transform is not None:
+            result = self.transform(result)
+
+        return result

@@ -1,5 +1,7 @@
 """DINOv2 model loading and embedding generation for DECam images."""
+import json
 import torch
+import numpy as np
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import h5py

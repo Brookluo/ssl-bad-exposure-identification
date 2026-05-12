@@ -6,7 +6,7 @@ _LAZY = {
              'reason_source_dict', 'decode_reason', 'decode_vi_source',
              'decode_ml_label', 'filter_dict', 'is_miss_2ccd'],
     'io': ['read_embeddings', 'read_fits_image', 'write_embeddings'],
-    'dataset': ['DECamImageDataset'],
+    'dataset': ['DECamImageDataset', 'DECamExposureDataset'],
     'embeddings': ['create_model', 'generate_embeddings'],
     'classifier': ['build_pipeline', 'train', 'predict',
                   'aggregate_exposure_embeddings', 'train_logistic_binary',
