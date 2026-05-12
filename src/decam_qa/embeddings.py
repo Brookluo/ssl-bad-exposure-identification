@@ -127,3 +127,102 @@ def convert_patch_embed_to_single_channel(model):
         if old_conv.bias is not None:
             new_conv.bias.copy_(old_conv.bias)
     model.patch_embed.proj = new_conv
+
+
+def generate_exposure_multiscale_embeddings(
+    dataset, model, device, output_dir,
+    batch_size=1, num_workers=2, top_k=8,
+    crop_size=None, resume=False, overwrite=False,
+):
+    """Generate multi-scale embeddings for exposure-grouped data.
+
+    For each exposure: embed the global stamp and top-K local views.
+    Store one HDF5 group per exposure with global, local_N, and metadata.
+
+    Parameters
+    ----------
+    dataset : DECamExposureDataset
+    model : torch.nn.Module
+    device : str
+    output_dir : str
+    batch_size : int
+    num_workers : int
+    top_k : int
+    crop_size : tuple or None
+        If None, resizes local crops to (2352, 1176).
+    resume : bool
+        Skip exposure groups that are already complete (global + expected number
+        of locals + metadata). Partially-written groups are deleted and regenerated.
+    overwrite : bool
+        If True and resume=False, overwrite existing.
+    """
+    output_dir = Path(output_dir)
+    embeds_dir = output_dir / "embeds_out"
+    embeds_dir.mkdir(exist_ok=True)
+
+    is_cuda = device != "cpu" and torch.cuda.is_available()
+    if is_cuda:
+        model = model.cuda()
+    else:
+        model = model.cpu()
+
+    if crop_size is None:
+        crop_size = (2352, 1176)
+    resize = transforms.Resize(crop_size, antialias=False)
+
+    h5path = embeds_dir / "0_worker_embeds.h5"
+
+    with torch.no_grad():
+        for i in range(len(dataset)):
+            item = dataset[i]
+            expnum = item["expnum"]
+
+            if resume:
+                if h5path.exists():
+                    needs_regeneration = False
+                    with h5py.File(h5path, 'r') as f:
+                        grp = f.get("exposures", {}).get(f"exp_{expnum}")
+                        if grp is not None:
+                            has_global = "global" in grp
+                            n_locals = sum(1 for k in grp.keys() if k.startswith("local_"))
+                            has_metadata = "metadata" in grp
+                            n_selected = len(item.get("selected_ccds", []))
+                            if has_global and n_locals == n_selected and has_metadata:
+                                continue
+                            else:
+                                needs_regeneration = True
+                    if needs_regeneration:
+                        with h5py.File(h5path, 'r+') as del_f:
+                            grp_path = f"exposures/exp_{expnum}"
+                            if grp_path in del_f:
+                                del del_f[grp_path]
+
+            global_tensor = torch.from_numpy(item["global_stamp"]).unsqueeze(0)
+            if is_cuda:
+                global_tensor = global_tensor.cuda()
+            global_emb = model.forward(global_tensor).numpy(force=True).flatten()
+
+            local_embs = []
+            for sel_img in item.get("selected_images", []):
+                if sel_img.ndim == 2:
+                    img_t = torch.from_numpy(sel_img).unsqueeze(0).unsqueeze(0).float()
+                else:
+                    img_t = torch.from_numpy(sel_img).float()
+                img_t = resize(img_t)
+                if is_cuda:
+                    img_t = img_t.cuda()
+                emb = model.forward(img_t).numpy(force=True).flatten()
+                local_embs.append(emb)
+
+            with h5py.File(h5path, 'a') as f:
+                if "exposures" not in f:
+                    f.create_group("exposures")
+                exp_grp = f["exposures"].create_group(f"exp_{expnum}")
+                exp_grp.create_dataset("global", data=global_emb, dtype='float')
+                for j, lem in enumerate(local_embs):
+                    exp_grp.create_dataset(f"local_{j:03d}", data=lem, dtype='float')
+                meta = {
+                    "num_selected_views": len(item.get("selected_ccds", [])),
+                    "filter": item.get("filter", 0),
+                }
+                exp_grp.create_dataset("metadata", data=json.dumps(meta))
