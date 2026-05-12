@@ -1,0 +1,25 @@
+# Multi-scale exposure identification config
+representation: exposure_multiscale
+
+model:
+  size: base
+  use_register: true
+  single_channel: true
+
+data:
+  batch_size: 1
+  crop_size: [2352, 1176]
+  num_workers: 4
+
+local_views:
+  top_k: 8
+  crop_size: [2352, 1176]
+
+focalplane_stamp:
+  binsize: 120
+
+image_roots:
+  dr10: /global/cfs/cdirs/cosmo/work/legacysurvey/dr10/images/
+  dr11: /global/cfs/cdirs/cosmo/work/legacysurvey/dr11/images/
+
+scratch_dir: ""

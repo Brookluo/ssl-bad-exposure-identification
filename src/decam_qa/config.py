@@ -6,6 +6,7 @@ import yaml
 
 _REQUIRED_KEYS = {
     "embed": ("model", "data", "image_roots"),
+    "exposure_multiscale": ("model", "data", "image_roots", "local_views", "focalplane_stamp"),
     "train": ("embeddings", "pipeline", "cv", "model_path"),
     "inference": ("pipeline_path", "embeddings_dir", "dataset_csv"),
 }
@@ -18,6 +19,14 @@ _DEFAULTS: Dict[str, Dict[str, Any]] = {
             "num_workers": 10, "pin_memory": False,
         },
         "distributed": {"backend": "nccl", "gpu_bind": "none"},
+        "scratch_dir": "",
+    },
+    "exposure_multiscale": {
+        "model": {"size": "base", "use_register": True, "single_channel": True},
+        "data": {"batch_size": 1, "crop_size": [2352, 1176], "num_workers": 4, "pin_memory": False},
+        "representation": "exposure_multiscale",
+        "local_views": {"top_k": 8, "crop_size": [2352, 1176]},
+        "focalplane_stamp": {"binsize": 120},
         "scratch_dir": "",
     },
     "train": {
