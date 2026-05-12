@@ -3,5 +3,6 @@ __pycache__/
 *.pyc
 *.pyo
 ext-data/
+.worktrees/
 # use py and jupytext track jupyter notebook
 *.ipynb
