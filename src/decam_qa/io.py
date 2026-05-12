@@ -111,3 +111,39 @@ def read_fits_image(image_path: str, hdu: int = 0) -> np.ndarray:
     with fits.open(image_path) as hdul:
         img_data = hdul[hdu].data
     return np.asarray(img_data).astype(img_data.dtype.newbyteorder('='))
+
+
+def read_exposure_embeddings(h5_dir_or_path):
+    """Read multi-scale exposure embeddings from HDF5 directory or file.
+
+    Accepts either a directory (globs ``*.h5``, merges across all
+    workers — matching read_embeddings behavior) or a single file path.
+
+    Returns dict: {expnum: {"global": array, "locals": [arrays], "metadata": dict}}
+    """
+    import json
+    import h5py
+
+    target = Path(h5_dir_or_path)
+    if target.is_dir():
+        h5_files = sorted(target.glob("*.h5"))
+        if not h5_files:
+            raise FileNotFoundError(f"No *.h5 files found in {target}")
+    else:
+        h5_files = [target]
+
+    result = {}
+    for fpath in h5_files:
+        with h5py.File(fpath, 'r') as f:
+            if "exposures" not in f:
+                continue
+            for exp_name in f["exposures"]:
+                expnum = int(exp_name.split("_")[1])
+                grp = f["exposures"][exp_name]
+                local_keys = sorted([k for k in grp.keys() if k.startswith("local_")])
+                result[expnum] = {
+                    "global": np.array(grp["global"]),
+                    "locals": [np.array(grp[k]) for k in local_keys],
+                    "metadata": json.loads(grp["metadata"][()]) if "metadata" in grp else {},
+                }
+    return result
