@@ -147,7 +147,7 @@ class DECamExposureDataset:
         filt = rows["filter"].iloc[0]
         reason_bitmask = int(np.bitwise_or.reduce(rows["reasons"].values))
 
-        with fits.open(self.image_dir / Path(image_filename).name) as hdul:
+        with fits.open(self.image_dir / Path(image_filename)) as hdul:
             ccd_images = []
             ccd_rows = []
             num_readable_ccds = 0
@@ -165,7 +165,7 @@ class DECamExposureDataset:
                 raise RuntimeError(f"No readable CCDs for exposure {expnum}")
 
             global_stamp = build_focalplane_stamp(
-                hdul, rows, binsize=self.binsize,
+                hdul, None, binsize=self.binsize,
             )
 
             scores = compute_anomaly_scores(ccd_images, ccd_rows)

@@ -1,5 +1,6 @@
 """DINOv2 model loading and embedding generation for DECam images."""
 import json
+from turtle import back
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
@@ -8,11 +9,13 @@ import h5py
 from pathlib import Path
 
 
-def create_model(size="base", use_register=True):
-    """Load a pre-trained DINOv2 Vision Transformer from PyTorch Hub.
+def create_model(version='v2', size="base", use_register=True):
+    """Load a pre-trained DINO Vision Transformer from PyTorch Hub.
 
     Parameters
     ----------
+    version : str
+        DINO version: currently only ``"v2"`` is supported.
     size : str
         Model size: ``"small"``, ``"base"``, ``"large"``, or ``"giant"``.
     use_register : bool
@@ -21,18 +24,32 @@ def create_model(size="base", use_register=True):
     Returns
     -------
     torch.nn.Module
-        DINOv2 model set to evaluation mode.
+        DINO model set to evaluation mode.
     """
+    assert version in ["v2", "v3"], f"Unsupported DINO version: {version}"
+    assert size in ["small", "base", "large", "giant"], f"Unsupported size: {size}"
     backbone_archs = {
-        "small": "vits14",
-        "base": "vitb14",
-        "large": "vitl14",
-        "giant": "vitg14",
+        "small": "vits14" if version == "v2" else "vits16plus",
+        "base": "vitb14" if version == "v2" else "vitb16",
+        "large": "vitl14" if version == "v2" else "vitl16",
+        "giant": "vitg14" if version == "v2" else "vith16plus",
     }
     backbone_arch = backbone_archs[size]
-    reg = "_reg" if use_register else ""
-    backbone_name = f"dinov2_{backbone_arch}{reg}"
-    model = torch.hub.load(repo_or_dir="facebookresearch/dinov2", model=backbone_name)
+    reg = ""
+    backbone_name = f"dino{version}_{backbone_arch}"
+    if version == "v2":
+        reg = "_reg" if use_register else ""
+        backbone_name = backbone_name + reg
+        model = torch.hub.load(repo_or_dir=f"facebookresearch/dino{version}", model=backbone_name)
+    else:
+        REPO_DIR = Path("/pscratch/sd/b/brookluo/dino-models")
+        dinov3_name = {
+            "vits16plus": "dinov3_vits16plus_pretrain_lvd1689m-4057cbaa.pth",
+            "vitb16": "dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth",
+            "vitl16": "dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd.pth",
+            "vith16plus": "dinov3_vith16plus_pretrain_lvd1689m-7c1da9a5.pth",
+        }
+        model = torch.hub.load(str(REPO_DIR / "dinov3") , backbone_name, source='local', weights=str(REPO_DIR / dinov3_name[backbone_arch]))
     model.eval()
     return model
 

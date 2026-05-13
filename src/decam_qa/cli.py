@@ -55,7 +55,7 @@ def main():
                 binsize=config.get("focalplane_stamp", {}).get("binsize", 120),
                 top_k=config.get("local_views", {}).get("top_k", 8),
             )
-            model = create_model(config["model"]["size"], config["model"]["use_register"])
+            model = create_model(config["model"]["version"], config["model"]["size"], config["model"]["use_register"])
             if config["model"].get("single_channel", True):
                 convert_patch_embed_to_single_channel(model)
 

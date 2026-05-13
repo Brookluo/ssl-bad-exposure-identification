@@ -20,5 +20,3 @@ training:
 distributed:
     backend: nccl
     device: cuda
-    
-  

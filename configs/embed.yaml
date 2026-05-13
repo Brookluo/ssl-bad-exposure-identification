@@ -1,6 +1,7 @@
 model:
+  version: "v3"
   size: base
-  use_register: true
+  use_register: false
 
 data:
   batch_size: 1
@@ -16,4 +17,4 @@ distributed:
   backend: nccl
   gpu_bind: none
 
-scratch_dir: /pscratch/sd/b/brookluo/decam-exposure/revision
+scratch_dir: /pscratch/sd/b/brookluo/decam-exposure/dinov3

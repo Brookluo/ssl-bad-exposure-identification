@@ -22,7 +22,7 @@ _DEFAULTS: Dict[str, Dict[str, Any]] = {
         "scratch_dir": "",
     },
     "exposure_multiscale": {
-        "model": {"size": "base", "use_register": True, "single_channel": True},
+        "model": {"version": "v2", "size": "base", "use_register": True, "single_channel": True},
         "data": {"batch_size": 1, "crop_size": [2352, 1176], "num_workers": 4, "pin_memory": False},
         "representation": "exposure_multiscale",
         "local_views": {"top_k": 8, "crop_size": [2352, 1176]},

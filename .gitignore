@@ -6,3 +6,5 @@ ext-data/
 .worktrees/
 # use py and jupytext track jupyter notebook
 *.ipynb
+samples
+vit-models

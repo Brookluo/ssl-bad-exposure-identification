@@ -3,6 +3,7 @@
 Builds low-resolution single-channel stamps from exposure HDUs by downsampling
 CCDs and placing them in focal-plane layout.
 """
+import pandas as pd
 import numpy as np
 from .info import ccdname2num
 
@@ -40,7 +41,7 @@ _NATIVE_Y = 26787
 _CCDNUM_TO_IDX = {num: i for i, num in enumerate(_CCD_NUM_LIST)}
 
 
-def build_focalplane_stamp(hdul, exposure_rows, binsize=120,
+def build_focalplane_stamp(hdul, exposure_rows=None, binsize=120,
                            subtract_median_sky=False, reducer="median",
                            fill_value=0.0):
     """Build a low-resolution focal-plane stamp from exposure HDUs.
@@ -54,7 +55,8 @@ def build_focalplane_stamp(hdul, exposure_rows, binsize=120,
     hdul : astropy.io.fits.HDUList
         Open FITS HDUList for the exposure (caller manages open/close).
     exposure_rows : list of dict or pd.DataFrame
-        Must have keys: ccdnum or ccdname, and image_hdu.
+        Must have keys: ccdnum or ccdname, and image_hdu. If None, will attempt to infer from HDUList names.
+        and plot the whole focal plane. 
     binsize : int
         Downsampling factor. A native 4094x2046 CCD becomes roughly
         4094/binsize by 2046/binsize before placement.
@@ -75,9 +77,14 @@ def build_focalplane_stamp(hdul, exposure_rows, binsize=120,
     stamp = np.full((stamp_h, stamp_w), fill_value, dtype=np.float32)
 
     # Normalize input: DataFrame -> list of dicts
+    if exposure_rows is None:
+        names = [hdu.name for hdu in hdul[1:]]
+        exposure_rows = pd.DataFrame({
+            "ccdnum": [ccdname2num.get(name.decode() if isinstance(name, bytes) else name, -1) for name in names],
+            "image_hdu": np.arange(1, len(hdul)),
+        })
     if hasattr(exposure_rows, "columns"):  # pd.DataFrame
         exposure_rows = exposure_rows.to_dict("records")
-
     for row in exposure_rows:
         if "ccdnum" in row:
             ccdnum = row["ccdnum"]

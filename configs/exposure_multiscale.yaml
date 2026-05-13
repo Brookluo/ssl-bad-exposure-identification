@@ -2,8 +2,9 @@
 representation: exposure_multiscale
 
 model:
+  version: "v3"
   size: base
-  use_register: true
+  use_register: false
   single_channel: true
 
 data:
@@ -16,10 +17,10 @@ local_views:
   crop_size: [2352, 1176]
 
 focalplane_stamp:
-  binsize: 120
+  binsize: 50
 
 image_roots:
   dr10: /global/cfs/cdirs/cosmo/work/legacysurvey/dr10/images/
   dr11: /global/cfs/cdirs/cosmo/work/legacysurvey/dr11/images/
 
-scratch_dir: ""
+scratch_dir: "/pscratch/sd/b/brookluo/decam-exposure/dinov3"
