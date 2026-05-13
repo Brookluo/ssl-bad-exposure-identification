@@ -4,9 +4,10 @@ Builds low-resolution single-channel stamps from exposure HDUs by downsampling
 CCDs and placing them in focal-plane layout.
 """
 import numpy as np
+from .info import ccdname2num
 
 
-# Focal-plane layout: x_pix and y_pix are CCD center positions in native
+# Focal-plane layout: x_pix and y_pix are CCD top-left positions in the native
 # pixel grid (29590 x 26787). Indices are ordered by ccdnum_list:
 # [1,2,3,...,60,62] (missing 61).
 _CCD_NUM_LIST = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
@@ -35,13 +36,12 @@ _Y_PIX = np.array([0, 0, 0, 2249, 2249, 2249, 2249, 4498, 4498, 4498, 4498,
 
 _NATIVE_X = 29590
 _NATIVE_Y = 26787
-
 # Pre-build mapping: ccdnum -> focal-plane row index
 _CCDNUM_TO_IDX = {num: i for i, num in enumerate(_CCD_NUM_LIST)}
 
 
 def build_focalplane_stamp(hdul, exposure_rows, binsize=120,
-                           subtract_median_sky=True, reducer="median",
+                           subtract_median_sky=False, reducer="median",
                            fill_value=0.0):
     """Build a low-resolution focal-plane stamp from exposure HDUs.
 
@@ -54,9 +54,10 @@ def build_focalplane_stamp(hdul, exposure_rows, binsize=120,
     hdul : astropy.io.fits.HDUList
         Open FITS HDUList for the exposure (caller manages open/close).
     exposure_rows : list of dict or pd.DataFrame
-        Must have keys: ccdnum, image_hdu.
+        Must have keys: ccdnum or ccdname, and image_hdu.
     binsize : int
-        Downsampling factor. Native CCD -> ~(CCD_WIDTH/binsize, CCD_HEIGHT/binsize).
+        Downsampling factor. A native 4094x2046 CCD becomes roughly
+        4094/binsize by 2046/binsize before placement.
     subtract_median_sky : bool
         If True, subtract median sky from each CCD before downsampling.
     reducer : str
@@ -69,8 +70,8 @@ def build_focalplane_stamp(hdul, exposure_rows, binsize=120,
     np.ndarray
         Single-channel stamp with shape (1, out_h, out_w).
     """
-    stamp_h = _NATIVE_Y // binsize + 1
-    stamp_w = _NATIVE_X // binsize + 1
+    stamp_h = int(np.ceil(_NATIVE_Y / binsize))
+    stamp_w = int(np.ceil(_NATIVE_X / binsize))
     stamp = np.full((stamp_h, stamp_w), fill_value, dtype=np.float32)
 
     # Normalize input: DataFrame -> list of dicts
@@ -78,7 +79,13 @@ def build_focalplane_stamp(hdul, exposure_rows, binsize=120,
         exposure_rows = exposure_rows.to_dict("records")
 
     for row in exposure_rows:
-        ccdnum = row["ccdnum"]
+        if "ccdnum" in row:
+            ccdnum = row["ccdnum"]
+        elif "ccdname" in row:
+            ccdname = row["ccdname"].decode() if isinstance(row["ccdname"], bytes) else row["ccdname"]
+            ccdnum = ccdname2num[ccdname]
+        else:
+            raise ValueError("Each row must have 'ccdnum' or 'ccdname' key")
         hdu_idx = row["image_hdu"]
 
         if ccdnum not in _CCDNUM_TO_IDX:
@@ -109,22 +116,31 @@ def build_focalplane_stamp(hdul, exposure_rows, binsize=120,
                                    trim_w // binsize, binsize)
             downsampled = np.mean(reshaped, axis=(1, 3))
 
-        # Place into canvas
+        # Place into a (y, x) canvas. Native DECam CCD arrays are indexed as
+        # (x, y), so transpose after downsampling, matching decam_postage_stamps.
+        stamp_ccd = downsampled.T
         fp_idx = _CCDNUM_TO_IDX[ccdnum]
-        x0 = int(_X_PIX[fp_idx] // binsize)
-        y0 = int(_Y_PIX[fp_idx] // binsize)
-        cc_h = downsampled.shape[0]
-        cc_w = downsampled.shape[1]
+        x0 = int(np.rint(_X_PIX[fp_idx] / binsize))
+        y0 = int(np.rint(_Y_PIX[fp_idx] / binsize))
+        cc_h = stamp_ccd.shape[0]
+        cc_w = stamp_ccd.shape[1]
 
-        # Clip to canvas boundaries
-        y_end = min(y0 + cc_h, stamp_h)
-        x_end = min(x0 + cc_w, stamp_w)
-        cc_h = y_end - y0
-        cc_w = x_end - x0
+        # Clamp to canvas boundaries (handle both negative and overflow)
+        src_y0 = max(0, -y0)
+        src_x0 = max(0, -x0)
+        dst_y0 = max(0, y0)
+        dst_x0 = max(0, x0)
+        dst_y1 = min(y0 + cc_h, stamp_h)
+        dst_x1 = min(x0 + cc_w, stamp_w)
+        copy_h = dst_y1 - dst_y0
+        copy_w = dst_x1 - dst_x0
 
-        stamp[y0:y_end, x0:x_end] = downsampled[:cc_h, :cc_w]
+        if copy_h > 0 and copy_w > 0:
+            stamp[dst_y0:dst_y1, dst_x0:dst_x1] = stamp_ccd[
+                src_y0:src_y0 + copy_h, src_x0:src_x0 + copy_w]
 
     # Replace non-finite values
     stamp[~np.isfinite(stamp)] = fill_value
-
-    return stamp[np.newaxis, :, :]
+    # to follow sky orientation, we need to rotate 180 degree
+    # see https://noirlab.edu/science/programs/ctio/instruments/Dark-Energy-Camera/characteristics
+    return stamp[np.newaxis, ::-1, ::-1]

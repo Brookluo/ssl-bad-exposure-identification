@@ -65,3 +65,21 @@ imgrow
 decam_info.ccdnum2name[14]
 
 # %%
+from decam_qa.focalplane import build_focalplane_stamp
+
+# %%
+imgrow = dr10_tab[dr10_tab['expnum'] == 412036]
+
+# %%
+data = fits.open(dr10_imdir / imgrow['image_filename'][0])
+
+# %%
+imgdata = build_focalplane_stamp(data, imgrow.to_pandas(), binsize=50)
+
+# %%
+plt.imshow(imgdata[0], origin='lower', vmin=0, vmax=1000, cmap='gray')
+
+# %%
+imgdata.shape
+
+# %%
